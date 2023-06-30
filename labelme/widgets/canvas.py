@@ -33,7 +33,10 @@ class Canvas(QtWidgets.QWidget):
     drawingPolygon = QtCore.Signal(bool)
     vertexSelected = QtCore.Signal(bool)
 
-    CREATE, EDIT = 0, 1
+    CREATE, EDIT, BRUSH = 0, 1, 2
+
+    # draw, erase
+    _brushMode = "draw"
 
     # polygon, rectangle, line, or point
     _createMode = "polygon"
@@ -124,10 +127,24 @@ class Canvas(QtWidgets.QWidget):
             "line",
             "point",
             "linestrip",
-            "ai_polygon",
+            "ai_polygon"
         ]:
             raise ValueError("Unsupported createMode: %s" % value)
         self._createMode = value
+
+    @property
+    def brushMode(self):
+        return self._brushMode
+    
+    @brushMode.setter
+    def brushMode(self, value):
+        if value not in [
+            "draw",
+            "erase"
+        ]:
+            raise ValueError("Unsupported brushMode: %s" % value)
+        self._brushMode = value
+
 
     def initializeAiModel(self, name):
         if name not in [model.name for model in labelme.ai.MODELS]:
@@ -206,6 +223,12 @@ class Canvas(QtWidgets.QWidget):
 
     def editing(self):
         return self.mode == self.EDIT
+
+    def setToBrush(self, value=True):
+        self.mode = self.BRUSH if value else self.mode
+
+        # Repaint
+        pass
 
     def setEditing(self, value=True):
         self.mode = self.EDIT if value else self.CREATE

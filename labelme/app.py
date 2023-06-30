@@ -376,6 +376,37 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Start drawing ai_polygon. Ctrl+LeftClick ends creation."),
             enabled=False,
         )
+
+        # Brush mode
+        brushMode = action(
+            self.tr("BrushMode"),                       # Text shown in UI
+            lambda: self.toggleBrushMode(),             # Function
+            None,                                       # Shortcut
+            "objects",                                  # Icon
+            self.tr("Toggle on brush mode"),                   # Tooltip
+            enabled=False,                              # isEnabled?
+        )
+
+        brushDrawMode = action(
+            self.tr("Draw"),
+            lambda: self.toggleBrushMode(True, "draw"),
+            None,
+            "objects",
+            self.tr("Start painting"),
+            enabled=False,
+        )
+
+        brushEraseMode = action(
+            self.tr("Erase"),
+            lambda: self.toggleBrushMode(True, "erase"),
+            None,
+            "objects",
+            self.tr("Start erasing"),
+            enabled=False,
+        )
+
+        
+        
         editMode = action(
             self.tr("Edit Polygons"),
             self.setEditMode,
@@ -613,6 +644,9 @@ class MainWindow(QtWidgets.QMainWindow):
             undoLastPoint=undoLastPoint,
             undo=undo,
             removePoint=removePoint,
+            brushMode=brushMode,
+            brushDrawMode=brushDrawMode,
+            brushEraseMode=brushEraseMode,
             createMode=createMode,
             editMode=editMode,
             createRectangleMode=createRectangleMode,
@@ -647,7 +681,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 None,
                 toggle_keep_prev_mode,
             ),
-            # menu shown at right click
+            # menu shown at right click IN CANVAS RANGE
             menu=(
                 createMode,
                 createRectangleMode,
@@ -666,6 +700,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 undoLastPoint,
                 removePoint,
             ),
+            # When on open image, the following will be enabled in UI
             onLoadActive=(
                 close,
                 createMode,
@@ -677,6 +712,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 createAiPolygonMode,
                 editMode,
                 brightnessContrast,
+                brushMode
             ),
             onShapesPresent=(saveAs, hideAll, showAll),
         )
@@ -777,6 +813,10 @@ class MainWindow(QtWidgets.QMainWindow):
             openPrevImg,
             save,
             deleteFile,
+            None,
+            brushMode,
+            brushDrawMode,
+            brushEraseMode,
             None,
             createMode,
             editMode,
@@ -992,10 +1032,49 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actions.undoLastPoint.setEnabled(drawing)
         self.actions.undo.setEnabled(not drawing)
         self.actions.delete.setEnabled(not drawing)
+        self.actions.brushMode.setEnabled(not drawing)
+
+    def toggleBrushMode(self, brush=True, brushMode="draw"):
+        self.canvas.setToBrush(brush)
+        self.canvas.brushMode = brushMode
+
+        if brush:
+            print("Brush mode: " + brushMode + " activated!")
+            logger.info("Brush mode: " + brushMode + " activated!")
+
+            self.actions.createMode.setEnabled(True)
+            self.actions.createRectangleMode.setEnabled(True)
+            self.actions.createCircleMode.setEnabled(True)
+            self.actions.createLineMode.setEnabled(True)
+            self.actions.createPointMode.setEnabled(True)
+            self.actions.createLineStripMode.setEnabled(True)
+            self.actions.createAiPolygonMode.setEnabled(True)
+            self.actions.editMode.setEnabled(True)
+            self._selectAiModelComboBox.setEnabled(False)
+            self.actions.brushMode.setEnabled(False)
+
+            # Check current brush mode
+            if brushMode == "draw":
+                self.actions.brushDrawMode.setEnabled(False)
+                self.actions.brushEraseMode.setEnabled(True)
+            elif brushMode == "erase":
+                self.actions.brushDrawMode.setEnabled(True)
+                self.actions.brushEraseMode.setEnabled(False)
+            else:
+                raise ValueError("Unsupported brushMode: %s" % brushMode)
+        else:
+            print("Brush mode deactivated!")
+            logger.info("Brush mode deactivated!")
+
+            self.actions.brushMode.setEnabled(True)
+            self.actions.brushDrawMode.setEnabled(False)
+            self.actions.brushEraseMode.setEnabled(False)
 
     def toggleDrawMode(self, edit=True, createMode="polygon"):
         self.canvas.setEditing(edit)
         self.canvas.createMode = createMode
+        self.toggleBrushMode(False)
+
         if edit:
             self.actions.createMode.setEnabled(True)
             self.actions.createRectangleMode.setEnabled(True)
@@ -1014,6 +1093,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.actions.createPointMode.setEnabled(True)
                 self.actions.createLineStripMode.setEnabled(True)
                 self.actions.createAiPolygonMode.setEnabled(True)
+                self.actions.brushMode.setEnabled(True)
                 self._selectAiModelComboBox.setEnabled(False)
             elif createMode == "rectangle":
                 self.actions.createMode.setEnabled(True)
