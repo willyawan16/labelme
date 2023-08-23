@@ -4,6 +4,7 @@ from qtpy import QtGui
 from qtpy import QtWidgets
 
 import labelme.ai
+from labelme.brush import Brush
 from labelme.logger import logger
 from labelme import QT5
 from labelme.shape import Shape
@@ -107,6 +108,10 @@ class Canvas(QtWidgets.QWidget):
         self.setFocusPolicy(QtCore.Qt.WheelFocus)
 
         self._ai_model = None
+
+        # Brush related
+        self.brush = Brush()
+
 
     def fillDrawing(self):
         return self._fill_drawing
@@ -218,6 +223,9 @@ class Canvas(QtWidgets.QWidget):
     def isVisible(self, shape):
         return self.visible.get(shape, True)
 
+    def brushing(self):
+        return self.mode == self.BRUSH
+
     def drawing(self):
         return self.mode == self.CREATE
 
@@ -265,6 +273,7 @@ class Canvas(QtWidgets.QWidget):
         except AttributeError:
             return
 
+        prevPoint = self.prevMovePoint
         self.prevMovePoint = pos
         self.restoreCursor()
 
@@ -325,6 +334,13 @@ class Canvas(QtWidgets.QWidget):
             assert len(self.line.points) == len(self.line.point_labels)
             self.repaint()
             self.current.highlightClear()
+            return
+        
+        # Brush
+        if self.brushing():
+            if QtCore.Qt.LeftButton & ev.buttons():
+                self.brush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
+                self.repaint()
             return
 
         # Polygon copy moving.
@@ -512,6 +528,9 @@ class Canvas(QtWidgets.QWidget):
                 group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
                 self.selectShapePoint(pos, multiple_selection_mode=group_mode)
                 self.prevPoint = pos
+                self.repaint()
+            elif self.brushing():
+                self.brush.drawToBrushCanvas(self.brushMode == "draw", pos)
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -756,59 +775,64 @@ class Canvas(QtWidgets.QWidget):
                 self.height() - 1,
             )
 
-        Shape.scale = self.scale
-        for shape in self.shapes:
-            if (shape.selected or not self._hideBackround) and self.isVisible(
-                shape
-            ):
-                shape.fill = shape.selected or shape == self.hShape
-                shape.paint(p)
-        if self.current:
-            self.current.paint(p)
-            assert len(self.line.points) == len(self.line.point_labels)
-            self.line.paint(p)
-        if self.selectedShapesCopy:
-            for s in self.selectedShapesCopy:
-                s.paint(p)
+        # brush mode here
+        if(self.brushing()):
+            self.brush.brushPainter(p)
+            logger.info("Repaint brush mask")
+        else:
+            Shape.scale = self.scale
+            for shape in self.shapes:
+                if (shape.selected or not self._hideBackround) and self.isVisible(
+                    shape
+                ):
+                    shape.fill = shape.selected or shape == self.hShape
+                    shape.paint(p)
+            if self.current:
+                self.current.paint(p)
+                assert len(self.line.points) == len(self.line.point_labels)
+                self.line.paint(p)
+            if self.selectedShapesCopy:
+                for s in self.selectedShapesCopy:
+                    s.paint(p)
 
-        if (
-            self.fillDrawing()
-            and self.createMode == "polygon"
-            and self.current is not None
-            and len(self.current.points) >= 2
-        ):
-            drawing_shape = self.current.copy()
-            if drawing_shape.fill_color.getRgb()[3] == 0:
-                logger.warning(
-                    "fill_drawing=true, but fill_color is transparent,"
-                    " so forcing to be opaque."
-                )
-                drawing_shape.fill_color.setAlpha(64)
-            drawing_shape.addPoint(self.line[1])
-            drawing_shape.fill = True
-            drawing_shape.paint(p)
-        elif self.createMode == "ai_polygon" and self.current is not None:
-            drawing_shape = self.current.copy()
-            drawing_shape.addPoint(
-                point=self.line.points[1],
-                label=self.line.point_labels[1],
-            )
-            points = self._ai_model.predict_polygon_from_points(
-                points=[
-                    [point.x(), point.y()] for point in drawing_shape.points
-                ],
-                point_labels=drawing_shape.point_labels,
-            )
-            if len(points) > 2:
-                drawing_shape.setShapeRefined(
-                    points=[
-                        QtCore.QPointF(point[0], point[1]) for point in points
-                    ],
-                    point_labels=[1] * len(points),
-                    shape_type="polygon",
-                )
-                drawing_shape.fill = self.fillDrawing()
+            if (
+                self.fillDrawing()
+                and self.createMode == "polygon"
+                and self.current is not None
+                and len(self.current.points) >= 2
+            ):
+                drawing_shape = self.current.copy()
+                if drawing_shape.fill_color.getRgb()[3] == 0:
+                    logger.warning(
+                        "fill_drawing=true, but fill_color is transparent,"
+                        " so forcing to be opaque."
+                    )
+                    drawing_shape.fill_color.setAlpha(64)
+                drawing_shape.addPoint(self.line[1])
+                drawing_shape.fill = True
                 drawing_shape.paint(p)
+            elif self.createMode == "ai_polygon" and self.current is not None:
+                drawing_shape = self.current.copy()
+                drawing_shape.addPoint(
+                    point=self.line.points[1],
+                    label=self.line.point_labels[1],
+                )
+                points = self._ai_model.predict_polygon_from_points(
+                    points=[
+                        [point.x(), point.y()] for point in drawing_shape.points
+                    ],
+                    point_labels=drawing_shape.point_labels,
+                )
+                if len(points) > 2:
+                    drawing_shape.setShapeRefined(
+                        points=[
+                            QtCore.QPointF(point[0], point[1]) for point in points
+                        ],
+                        point_labels=[1] * len(points),
+                        shape_type="polygon",
+                    )
+                    drawing_shape.fill = self.fillDrawing()
+                    drawing_shape.paint(p)
 
         p.end()
 

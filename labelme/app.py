@@ -405,7 +405,23 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
 
-        
+        brushIncrSize = action(
+            self.tr("Incr Size"),
+            lambda: self.updateBrushSize(True),
+            None,
+            "objects",
+            self.tr("Increase brush size by 1px"),
+            enabled=False,
+        )
+
+        brushDecrSize = action(
+            self.tr("Decr Size"),
+            lambda: self.updateBrushSize(False),
+            None,
+            "objects",
+            self.tr("Decrease brush size by 1px"),
+            enabled=False,
+        )        
         
         editMode = action(
             self.tr("Edit Polygons"),
@@ -647,6 +663,8 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode=brushMode,
             brushDrawMode=brushDrawMode,
             brushEraseMode=brushEraseMode,
+            brushIncrSize=brushIncrSize,
+            brushDecrSize=brushDecrSize,
             createMode=createMode,
             editMode=editMode,
             createRectangleMode=createRectangleMode,
@@ -817,6 +835,8 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode,
             brushDrawMode,
             brushEraseMode,
+            brushIncrSize,
+            brushDecrSize,
             None,
             createMode,
             editMode,
@@ -1034,12 +1054,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actions.delete.setEnabled(not drawing)
         self.actions.brushMode.setEnabled(not drawing)
 
+    # BRUSH RELATED FUNCTIONS -- START
+
     def toggleBrushMode(self, brush=True, brushMode="draw"):
         self.canvas.setToBrush(brush)
         self.canvas.brushMode = brushMode
 
         if brush:
-            print("Brush mode: " + brushMode + " activated!")
             logger.info("Brush mode: " + brushMode + " activated!")
 
             self.actions.createMode.setEnabled(True)
@@ -1052,6 +1073,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.editMode.setEnabled(True)
             self._selectAiModelComboBox.setEnabled(False)
             self.actions.brushMode.setEnabled(False)
+            self.actions.brushIncrSize.setEnabled(self.canvas.brush.isBrushIncreasable())
+            self.actions.brushDecrSize.setEnabled(self.canvas.brush.isBrushDecreasable())
 
             # Check current brush mode
             if brushMode == "draw":
@@ -1063,12 +1086,23 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 raise ValueError("Unsupported brushMode: %s" % brushMode)
         else:
-            print("Brush mode deactivated!")
             logger.info("Brush mode deactivated!")
 
             self.actions.brushMode.setEnabled(True)
             self.actions.brushDrawMode.setEnabled(False)
             self.actions.brushEraseMode.setEnabled(False)
+            self.actions.brushIncrSize.setEnabled(False)
+            self.actions.brushDecrSize.setEnabled(False)
+        # init canvas
+        self.canvas.repaint()
+
+    def updateBrushSize(self, increase=True):
+        self.canvas.brush.alterSize(1 if increase else -1)
+
+        self.actions.brushIncrSize.setEnabled(self.canvas.brush.isBrushIncreasable())
+        self.actions.brushDecrSize.setEnabled(self.canvas.brush.isBrushDecreasable())            
+
+    # BRUSH RELATED FUNCTIONS -- END
 
     def toggleDrawMode(self, edit=True, createMode="polygon"):
         self.canvas.setEditing(edit)
@@ -1745,6 +1779,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.brightnessContrast_values[self.filename] = (brightness, contrast)
         if brightness is not None or contrast is not None:
             dialog.onNewValue(None)
+        
+        # Brush related
+        self.canvas.brush.initBrushCanvas(image.width(), image.height())
+        
         self.paintCanvas()
         self.addRecentFile(self.filename)
         self.toggleActions(True)
