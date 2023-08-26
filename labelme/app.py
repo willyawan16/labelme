@@ -405,24 +405,15 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
 
-        brushIncrSize = action(
-            self.tr("Incr Size"),
-            lambda: self.updateBrushSize(True),
-            None,
-            "objects",
-            self.tr("Increase brush size by 1px"),
+        slider = functools.partial(utils.newSlider, self)
+        brushSize = slider(
+            self.tr("Set brush size"),
+            lambda value: self.updateBrushSize(value),
+            minValue=1,
+            maxValue=6,
             enabled=False,
         )
 
-        brushDecrSize = action(
-            self.tr("Decr Size"),
-            lambda: self.updateBrushSize(False),
-            None,
-            "objects",
-            self.tr("Decrease brush size by 1px"),
-            enabled=False,
-        )        
-        
         editMode = action(
             self.tr("Edit Polygons"),
             self.setEditMode,
@@ -633,7 +624,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self._config["canvas"]["fill_drawing"]:
             fill_drawing.trigger()
 
-        # Lavel list context menu.
+        # Label list context menu.
         labelMenu = QtWidgets.QMenu()
         utils.addActions(labelMenu, (edit, delete))
         self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -663,8 +654,7 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode=brushMode,
             brushDrawMode=brushDrawMode,
             brushEraseMode=brushEraseMode,
-            brushIncrSize=brushIncrSize,
-            brushDecrSize=brushDecrSize,
+            brushSize=brushSize,
             createMode=createMode,
             editMode=editMode,
             createRectangleMode=createRectangleMode,
@@ -835,8 +825,7 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode,
             brushDrawMode,
             brushEraseMode,
-            brushIncrSize,
-            brushDecrSize,
+            brushSize,
             None,
             createMode,
             editMode,
@@ -1073,8 +1062,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.editMode.setEnabled(True)
             self._selectAiModelComboBox.setEnabled(False)
             self.actions.brushMode.setEnabled(False)
-            self.actions.brushIncrSize.setEnabled(self.canvas.brush.isBrushIncreasable())
-            self.actions.brushDecrSize.setEnabled(self.canvas.brush.isBrushDecreasable())
+            self.actions.brushSize.setEnabled(True)
 
             # Check current brush mode
             if brushMode == "draw":
@@ -1091,16 +1079,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushMode.setEnabled(True)
             self.actions.brushDrawMode.setEnabled(False)
             self.actions.brushEraseMode.setEnabled(False)
-            self.actions.brushIncrSize.setEnabled(False)
-            self.actions.brushDecrSize.setEnabled(False)
+            self.actions.brushSize.setEnabled(False)
         # init canvas
         self.canvas.repaint()
 
-    def updateBrushSize(self, increase=True):
-        self.canvas.brush.alterSize(1 if increase else -1)
-
-        self.actions.brushIncrSize.setEnabled(self.canvas.brush.isBrushIncreasable())
-        self.actions.brushDecrSize.setEnabled(self.canvas.brush.isBrushDecreasable())            
+    def updateBrushSize(self, value):
+        size = self.canvas.brush.setSize(value)
+        logger.info(size)      
 
     # BRUSH RELATED FUNCTIONS -- END
 

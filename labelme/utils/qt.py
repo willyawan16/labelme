@@ -7,7 +7,6 @@ from qtpy import QtCore
 from qtpy import QtGui
 from qtpy import QtWidgets
 
-
 here = osp.dirname(osp.abspath(__file__))
 
 
@@ -57,6 +56,23 @@ def newAction(
     a.setChecked(checked)
     return a
 
+def newSlider(
+        parent,
+        text,
+        slot=None,
+        minValue=0,
+        maxValue=10,
+        orientation=QtCore.Qt.Orientation.Horizontal,
+        enabled=True
+):
+    s = QtWidgets.QSlider(orientation, parent)
+    s.setObjectName(text)
+    if slot is not None:
+        s.valueChanged.connect(slot)
+    s.setRange(minValue, maxValue)
+    s.setEnabled(enabled)
+    return s
+
 
 def addActions(widget, actions):
     for action in actions:
@@ -64,6 +80,8 @@ def addActions(widget, actions):
             widget.addSeparator()
         elif isinstance(action, QtWidgets.QMenu):
             widget.addMenu(action)
+        elif isinstance(action, QtWidgets.QSlider):
+            widget.addSlider(action)
         else:
             widget.addAction(action)
 

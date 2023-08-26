@@ -12,16 +12,10 @@ class Brush(object):
     def __init__(self):
         self.brushSize = 1
         self.brushMask = QPixmap()
-
-    def alterSize(self, incr=1) -> int:
-        self.brushSize += incr
-        return self.brushSize
-
-    def isBrushIncreasable(self) -> bool:
-        return self.brushSize < self.MAX_SIZE
     
-    def isBrushDecreasable(self) -> bool:
-        return self.brushSize > self.MIN_SIZE
+    def setSize(self, value) -> int:
+        self.brushSize = value
+        return self.brushSize
 
     # Temporary
     def initBrushCanvas(self, width: int, height: int):

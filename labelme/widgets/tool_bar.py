@@ -26,3 +26,9 @@ class ToolBar(QtWidgets.QToolBar):
                 self.layout().itemAt(i).widget(), QtWidgets.QToolButton
             ):
                 self.layout().itemAt(i).setAlignment(QtCore.Qt.AlignCenter)
+    
+    def addSlider(self, action: QtWidgets.QSlider):
+        label = QtWidgets.QLabel(self.tr("Set brush size"))
+        label.setAlignment(QtCore.Qt.AlignCenter)
+        self.addWidget(action)
+        self.addWidget(label)
