@@ -38,6 +38,7 @@ class LabelFile(object):
 
     def __init__(self, filename=None):
         self.shapes = []
+        self.b64brushMask = None
         self.imagePath = None
         self.imageData = None
         if filename is not None:
@@ -73,6 +74,7 @@ class LabelFile(object):
             "imageData",
             "imagePath",
             "shapes",  # polygonal annotations
+            "b64brushMask",
             "flags",  # image level flags
             "imageHeight",
             "imageWidth",
@@ -118,6 +120,7 @@ class LabelFile(object):
                 )
                 for s in data["shapes"]
             ]
+            b64brushMask = base64.b64decode(data["b64brushMask"])
         except Exception as e:
             raise LabelFileError(e)
 
@@ -129,6 +132,7 @@ class LabelFile(object):
         # Only replace data after everything is loaded.
         self.flags = flags
         self.shapes = shapes
+        self.b64brushMask = b64brushMask
         self.imagePath = imagePath
         self.imageData = imageData
         self.filename = filename
@@ -155,6 +159,7 @@ class LabelFile(object):
         self,
         filename,
         shapes,
+        b64brushMask,
         imagePath,
         imageHeight,
         imageWidth,
@@ -175,6 +180,7 @@ class LabelFile(object):
             version=__version__,
             flags=flags,
             shapes=shapes,
+            b64brushMask=base64.b64encode(b64brushMask).decode("utf-8"),
             imagePath=imagePath,
             imageData=imageData,
             imageHeight=imageHeight,

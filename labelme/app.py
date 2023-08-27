@@ -2,6 +2,7 @@
 
 import functools
 import html
+import json
 import math
 import os
 import os.path as osp
@@ -10,6 +11,7 @@ import webbrowser
 
 import imgviz
 import natsort
+import base64
 from qtpy import QtCore
 from qtpy.QtCore import Qt
 from qtpy import QtGui
@@ -1375,6 +1377,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._noSelectionSlot = False
         self.canvas.loadShapes(shapes, replace=replace)
 
+    def loadBrushMask(self):
+        data = QtCore.QByteArray.fromBase64(self.labelFile.b64brushMask)
+        self.canvas.brush.brushMask.loadFromData(data, "PNG")
+        self.canvas.update()
+
     def loadLabels(self, shapes):
         s = []
         for shape in shapes:
@@ -1420,6 +1427,15 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if flag else Qt.Unchecked)
             self.flag_widget.addItem(item)
+    
+    def pixmap_to_json(self):
+        currentPixmap = self.canvas.brush.brushMask.copy()
+        bytes = QtCore.QByteArray()
+        buffer = QtCore.QBuffer(bytes)
+        buffer.open(QtCore.QIODevice.WriteOnly)
+        currentPixmap.save(buffer, "PNG") # writes pixmap into bytes in PNG format
+        return bytes.toBase64()
+
 
     def saveLabels(self, filename):
         lf = LabelFile()
@@ -1453,6 +1469,7 @@ class MainWindow(QtWidgets.QMainWindow):
             lf.save(
                 filename=filename,
                 shapes=shapes,
+                b64brushMask=self.pixmap_to_json(),
                 imagePath=imagePath,
                 imageData=imageData,
                 imageHeight=self.image.height(),
@@ -1772,9 +1789,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.brightnessContrast_values[self.filename] = (brightness, contrast)
         if brightness is not None or contrast is not None:
             dialog.onNewValue(None)
+
         
         # Brush related
         self.canvas.brush.initBrushCanvas(image.width(), image.height())
+        if self.labelFile:
+            if self.labelFile.b64brushMask is not None:
+                self.loadBrushMask()
         
         self.paintCanvas()
         self.addRecentFile(self.filename)
@@ -1987,6 +2008,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.close()
         else:
             self._saveFile(self.saveFileDialog())
+
+        
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
