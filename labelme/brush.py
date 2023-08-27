@@ -46,23 +46,21 @@ class Brush(object):
             painter.drawLine(prevPoint, point)
         else:
             painter.drawPoint(point)
-        
-        # Add to history
-        self.addStroke()
 
     def brushPainter(self, painterx: QtGui.QPainter):
         painterx.setOpacity(0.4)
         painterx.drawPixmap(0, 0, self.brushMask)
         painterx.setOpacity(1)
     
-    def addStroke(self):
+    def addStrokeToHistory(self):
+        logger.info("Add stroke history")
         if len(self.history) >= self.MAX_HISTORY_LEN:
             self.history = self.history[1:]
-        self.history.append(self.brushMask)
+        self.history.append(self.brushMask.copy())
 
     def undoStroke(self):
-        if self.history is not None and len(self.history) > 0:
+        if self.history is not None and len(self.history) >= 1:
             self.history.pop()
-            self.brushMask = self.history[-1]
+            self.brushMask = self.history[-1].copy()
         else:
             logger.info("No stroke history...")

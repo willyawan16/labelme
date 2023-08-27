@@ -187,6 +187,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.scrollRequest.connect(self.scrollRequest)
 
         self.canvas.newShape.connect(self.newShape)
+        self.canvas.brushMoved.connect(self.setDirty)
         self.canvas.shapeMoved.connect(self.setDirty)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
@@ -409,8 +410,8 @@ class MainWindow(QtWidgets.QMainWindow):
         brushSize = slider(
             self.tr("Set brush size"),
             lambda value: self.updateBrushSize(value),
-            minValue=1,
-            maxValue=6,
+            minValue=self.canvas.brush.MIN_SIZE,
+            maxValue=self.canvas.brush.MAX_SIZE,
             enabled=False,
         )
 
@@ -1045,11 +1046,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         In the middle of drawing, toggling between modes should be disabled.
         """
+        self.actions.brushMode.setEnabled(not drawing)
         self.actions.editMode.setEnabled(not drawing)
         self.actions.undoLastPoint.setEnabled(drawing)
         self.actions.undo.setEnabled(not drawing)
         self.actions.delete.setEnabled(not drawing)
-        self.actions.brushMode.setEnabled(not drawing)
 
     # BRUSH RELATED FUNCTIONS -- START
 
@@ -1071,6 +1072,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._selectAiModelComboBox.setEnabled(False)
             self.actions.brushMode.setEnabled(False)
             self.actions.brushSize.setEnabled(True)
+            self.actions.undo.setEnabled(self.canvas.isBrushUndoable)
 
             # Check current brush mode
             if brushMode == "draw":
@@ -1088,12 +1090,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushDrawMode.setEnabled(False)
             self.actions.brushEraseMode.setEnabled(False)
             self.actions.brushSize.setEnabled(False)
+            self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
         # init canvas
         self.canvas.repaint()
 
     def updateBrushSize(self, value):
-        size = self.canvas.brush.setSize(value)
-        logger.info(size)      
+        self.canvas.brush.setSize(value)
 
     # BRUSH RELATED FUNCTIONS -- END
 

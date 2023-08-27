@@ -31,6 +31,7 @@ class Canvas(QtWidgets.QWidget):
     newShape = QtCore.Signal()
     selectionChanged = QtCore.Signal(list)
     shapeMoved = QtCore.Signal()
+    brushMoved = QtCore.Signal()
     drawingPolygon = QtCore.Signal(bool)
     vertexSelected = QtCore.Signal(bool)
 
@@ -199,7 +200,7 @@ class Canvas(QtWidgets.QWidget):
     def isBrushUndoable(self):
         if not self.brushing():
             return False
-        if len(self.brush.history) < 2:
+        if len(self.brush.history) < 1:
             return False
         return True
 
@@ -573,6 +574,9 @@ class Canvas(QtWidgets.QWidget):
                     self.selectionChanged.emit(
                         [x for x in self.selectedShapes if x != self.hShape]
                     )
+            elif self.brushing():
+                self.brush.addStrokeToHistory()
+                self.brushMoved.emit()
 
         if self.movingShape and self.hShape:
             index = self.shapes.index(self.hShape)
@@ -788,7 +792,6 @@ class Canvas(QtWidgets.QWidget):
         # brush mode here
         if(self.brushing()):
             self.brush.brushPainter(p)
-            logger.info("Repaint brush mask")
         else:
             Shape.scale = self.scale
             for shape in self.shapes:
@@ -1050,7 +1053,6 @@ class Canvas(QtWidgets.QWidget):
         logger.info("Undo brush stroke")
         self.brush.undoStroke()
         self.update()
-        self.repaint()
 
     def undoLastLine(self):
         logger.info("Undo last line")

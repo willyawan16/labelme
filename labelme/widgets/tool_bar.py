@@ -30,7 +30,15 @@ class ToolBar(QtWidgets.QToolBar):
     def addSlider(self, action: QtWidgets.QSlider):
         label = QtWidgets.QLabel(self.tr("Set brush size"))
         label.setAlignment(QtCore.Qt.AlignCenter)
-        action.setBaseSize(10, 5)
-        action.setMaximumSize(50, 5)
+        action.setBaseSize(240, 24)
+        action.setMaximumSize(360, 24)
         self.addWidget(action)
         self.addWidget(label)
+
+        # center align
+        for i in range(self.layout().count()):
+            if isinstance(
+                self.layout().itemAt(i).widget(), QtWidgets.QSlider
+            ):
+                self.layout().itemAt(i).setAlignment(QtCore.Qt.AlignCenter)
+        
