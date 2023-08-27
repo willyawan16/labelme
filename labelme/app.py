@@ -474,10 +474,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         undo = action(
             self.tr("Undo"),
-            self.undoShapeEdit,
+            self.undoAction,
             shortcuts["undo"],
             "undo",
-            self.tr("Undo last add and edit of shape"),
+            self.tr("Undo last add and edit of shape / undo last action"),
             enabled=False,
         )
 
@@ -833,9 +833,9 @@ class MainWindow(QtWidgets.QMainWindow):
             copy,
             paste,
             delete,
+            None,
             undo,
             brightnessContrast,
-            None,
             zoom,
             fitWidth,
             None,
@@ -949,7 +949,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def setDirty(self):
         # Even if we autosave the file, we keep the ability to undo
-        self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
+        self.actions.undo.setEnabled(self.canvas.isShapeRestorable or self.canvas.isBrushUndoable)
 
         if self._config["auto_save"] or self.actions.saveAuto.isChecked():
             label_file = osp.splitext(self.imagePath)[0] + ".json"
@@ -1022,7 +1022,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Callbacks
 
+    def undoAction(self):
+        if self.canvas.brushing():
+            self.canvas.undoBrushStroke()
+            self.actions.undo.setEnabled(self.canvas.isBrushUndoable)
+        else:
+            self.undoShapeEdit()
+
     def undoShapeEdit(self):
+        logger.info("Undo shape edit")
         self.canvas.restoreShape()
         self.labelList.clear()
         self.loadShapes(self.canvas.shapes)

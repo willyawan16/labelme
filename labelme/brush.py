@@ -8,14 +8,19 @@ class Brush(object):
 
     MIN_SIZE = 1
     MAX_SIZE = 6
+    MAX_HISTORY_LEN = 10
 
     def __init__(self):
         self.brushSize = 1
         self.brushMask = QPixmap()
+        self.history = []
     
     def setSize(self, value) -> int:
         self.brushSize = value
         return self.brushSize
+    
+    def isUndoable(self) -> bool:
+        return len(self.history) > 0
 
     # Temporary
     def initBrushCanvas(self, width: int, height: int):
@@ -41,8 +46,23 @@ class Brush(object):
             painter.drawLine(prevPoint, point)
         else:
             painter.drawPoint(point)
+        
+        # Add to history
+        self.addStroke()
 
     def brushPainter(self, painterx: QtGui.QPainter):
         painterx.setOpacity(0.4)
         painterx.drawPixmap(0, 0, self.brushMask)
         painterx.setOpacity(1)
+    
+    def addStroke(self):
+        if len(self.history) >= self.MAX_HISTORY_LEN:
+            self.history = self.history[1:]
+        self.history.append(self.brushMask)
+
+    def undoStroke(self):
+        if self.history is not None and len(self.history) > 0:
+            self.history.pop()
+            self.brushMask = self.history[-1]
+        else:
+            logger.info("No stroke history...")

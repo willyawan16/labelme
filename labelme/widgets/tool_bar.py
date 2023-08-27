@@ -30,5 +30,7 @@ class ToolBar(QtWidgets.QToolBar):
     def addSlider(self, action: QtWidgets.QSlider):
         label = QtWidgets.QLabel(self.tr("Set brush size"))
         label.setAlignment(QtCore.Qt.AlignCenter)
+        action.setBaseSize(10, 5)
+        action.setMaximumSize(50, 5)
         self.addWidget(action)
         self.addWidget(label)

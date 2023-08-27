@@ -189,7 +189,17 @@ class Canvas(QtWidgets.QWidget):
         # We save the state AFTER each edit (not before) so for an
         # edit to be undoable, we expect the CURRENT and the PREVIOUS state
         # to be in the undo stack.
+        if not self.drawing() and not self.editing():
+            return False
         if len(self.shapesBackups) < 2:
+            return False
+        return True
+    
+    @property
+    def isBrushUndoable(self):
+        if not self.brushing():
+            return False
+        if len(self.brush.history) < 2:
             return False
         return True
 
@@ -1036,7 +1046,14 @@ class Canvas(QtWidgets.QWidget):
         self.storeShapes()
         return self.shapes[-1]
 
+    def undoBrushStroke(self):
+        logger.info("Undo brush stroke")
+        self.brush.undoStroke()
+        self.update()
+        self.repaint()
+
     def undoLastLine(self):
+        logger.info("Undo last line")
         assert self.shapes
         self.current = self.shapes.pop()
         self.current.setOpen()
@@ -1050,6 +1067,7 @@ class Canvas(QtWidgets.QWidget):
         self.drawingPolygon.emit(True)
 
     def undoLastPoint(self):
+        logger.info("Undo last point")
         if not self.current or self.current.isClosed():
             return
         self.current.popPoint()
