@@ -73,6 +73,22 @@ def newSlider(
     s.setEnabled(enabled)
     return s
 
+def newTextBox(
+    parent,
+    slot=None,
+    minValue=0,
+    maxValue=10,
+    step=1,
+    enabled=True
+):
+    t = QtWidgets.QSpinBox(parent)
+    if slot is not None:
+        t.valueChanged.connect(slot)
+    t.setRange(minValue, maxValue)
+    t.setSingleStep(step)
+    t.setEnabled(enabled)
+    return t
+
 
 def addActions(widget, actions):
     for action in actions:
@@ -82,6 +98,8 @@ def addActions(widget, actions):
             widget.addMenu(action)
         elif isinstance(action, QtWidgets.QSlider):
             widget.addSlider(action)
+        elif isinstance(action, QtWidgets.QSpinBox):
+            widget.addTextBox(action)
         else:
             widget.addAction(action)
 

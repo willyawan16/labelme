@@ -41,4 +41,14 @@ class ToolBar(QtWidgets.QToolBar):
                 self.layout().itemAt(i).widget(), QtWidgets.QSlider
             ):
                 self.layout().itemAt(i).setAlignment(QtCore.Qt.AlignCenter)
+    
+    def addTextBox(self, action: QtWidgets.QSpinBox):
+        self.addWidget(action)
+
+        # center align
+        for i in range(self.layout().count()):
+            if isinstance(
+                self.layout().itemAt(i).widget(), QtWidgets.QSpinBox
+            ):
+                self.layout().itemAt(i).setAlignment(QtCore.Qt.AlignCenter)
         

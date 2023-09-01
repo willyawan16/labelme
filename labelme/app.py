@@ -386,7 +386,7 @@ class MainWindow(QtWidgets.QMainWindow):
             lambda: self.toggleBrushMode(),             # Function
             None,                                       # Shortcut
             "objects",                                  # Icon
-            self.tr("Toggle on brush mode"),                   # Tooltip
+            self.tr("Toggle on brush mode"),            # Tooltip
             enabled=False,                              # isEnabled?
         )
 
@@ -409,13 +409,27 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         slider = functools.partial(utils.newSlider, self)
-        brushSize = slider(
+        brushSizeSlider = slider(
             self.tr("Set brush size"),
-            lambda value: self.updateBrushSize(value),
+            lambda val: self.updateBrushSize(val),
             minValue=self.canvas.brush.MIN_SIZE,
             maxValue=self.canvas.brush.MAX_SIZE,
             enabled=False,
         )
+
+        textBox = functools.partial(utils.newTextBox, self)
+        brushSizeTextBox = textBox(
+            lambda val: self.updateBrushSize(val),
+            minValue=self.canvas.brush.MIN_SIZE,
+            maxValue=self.canvas.brush.MAX_SIZE,
+            step=1,
+            enabled=False
+        )
+
+        # brushSizeLayout = QtWidgets.QHBoxLayout()
+        # brushSizeLayout.addWidget(brushSizeSlider)
+        # brushSizeLayout.addWidget(brushSizeTextBox)
+        
 
         editMode = action(
             self.tr("Edit Polygons"),
@@ -657,7 +671,8 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode=brushMode,
             brushDrawMode=brushDrawMode,
             brushEraseMode=brushEraseMode,
-            brushSize=brushSize,
+            brushSizeSlider=brushSizeSlider,
+            brushSizeTextBox=brushSizeTextBox,
             createMode=createMode,
             editMode=editMode,
             createRectangleMode=createRectangleMode,
@@ -828,7 +843,9 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode,
             brushDrawMode,
             brushEraseMode,
-            brushSize,
+            brushSizeSlider,
+            brushSizeTextBox,
+            # brushSizeLayout,
             None,
             createMode,
             editMode,
@@ -1073,7 +1090,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.editMode.setEnabled(True)
             self._selectAiModelComboBox.setEnabled(False)
             self.actions.brushMode.setEnabled(False)
-            self.actions.brushSize.setEnabled(True)
+            self.actions.brushSizeSlider.setEnabled(True)
+            self.actions.brushSizeTextBox.setEnabled(True)
             self.actions.undo.setEnabled(self.canvas.isBrushUndoable)
 
             # Check current brush mode
@@ -1091,13 +1109,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushMode.setEnabled(True)
             self.actions.brushDrawMode.setEnabled(False)
             self.actions.brushEraseMode.setEnabled(False)
-            self.actions.brushSize.setEnabled(False)
+            self.actions.brushSizeSlider.setEnabled(False)
+            self.actions.brushSizeTextBox.setEnabled(False)
             self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
         # init canvas
         self.canvas.repaint()
 
     def updateBrushSize(self, value):
+        logger.info(self)
+        logger.info(self.actions)
+        #logger.info(len(self.actions))
         self.canvas.brush.setSize(value)
+        #self.actions.brushSizeSlider.value=value
+        #self.actions.brushSizeTextBox.value=value
 
     # BRUSH RELATED FUNCTIONS -- END
 
