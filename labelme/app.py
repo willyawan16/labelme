@@ -1079,6 +1079,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if brush:
             logger.info("Brush mode: " + brushMode + " activated!")
+            logger.info(self.actions)
 
             self.actions.createMode.setEnabled(True)
             self.actions.createRectangleMode.setEnabled(True)
@@ -1116,12 +1117,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.repaint()
 
     def updateBrushSize(self, value):
-        logger.info(self)
-        logger.info(self.actions)
-        #logger.info(len(self.actions))
+        if type(self.actions) is utils.struct:
+            logger.info("Update slider & text box")
+            self.actions.brushSizeSlider.setValue(value)
+            self.actions.brushSizeTextBox.setValue(value)
         self.canvas.brush.setSize(value)
-        #self.actions.brushSizeSlider.value=value
-        #self.actions.brushSizeTextBox.value=value
 
     # BRUSH RELATED FUNCTIONS -- END
 

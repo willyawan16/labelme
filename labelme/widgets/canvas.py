@@ -349,9 +349,13 @@ class Canvas(QtWidgets.QWidget):
         
         # Brush
         if self.brushing():
+
+            self.overrideCursor(CURSOR_DRAW)
+
             if QtCore.Qt.LeftButton & ev.buttons():
                 self.brush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
-                self.repaint()
+            
+            self.repaint()
             return
 
         # Polygon copy moving.
@@ -791,7 +795,7 @@ class Canvas(QtWidgets.QWidget):
 
         # brush mode here
         if(self.brushing()):
-            self.brush.brushPainter(p)
+            self.brush.brushPainter(p, self.prevMovePoint, self.brushMode == "draw")
         else:
             Shape.scale = self.scale
             for shape in self.shapes:

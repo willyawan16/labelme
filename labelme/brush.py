@@ -7,13 +7,16 @@ from labelme.logger import logger
 class Brush(object):
 
     MIN_SIZE = 1
-    MAX_SIZE = 6
+    MAX_SIZE = 256
     MAX_HISTORY_LEN = 10
 
     def __init__(self):
         self.brushSize = 1
         self.brushMask = QPixmap()
         self.history = []
+
+        self.pen = QPen(QColor(0, 255, 0))
+        self.pen.setCapStyle(QtCore.Qt.PenCapStyle.RoundCap)
     
     def setSize(self, value) -> int:
         self.brushSize = value
@@ -29,27 +32,35 @@ class Brush(object):
 
     def drawToBrushCanvas(self, isDraw, point, prevPoint=None):
         painter = QtGui.QPainter(self.brushMask)
-        pen = QPen(QColor(0, 0, 0)) # set black to default
 
         if isDraw:
-            pen = QPen(QColor(0, 255, 0))
+            self.pen.setColor(QColor(0, 255, 0))
         else:
-            pen = QPen(QColor(0, 0, 0))
+            self.pen.setColor(QColor(0, 0, 0))
         
-        penWidths = [8, 16, 32, 64, 128, 256]
-        pen.setCapStyle(QtCore.Qt.PenCapStyle.RoundCap)
-        pen.setWidth(penWidths[self.brushSize - 1])  
+        #penWidths = [8, 16, 32, 64, 128, 256]
+        self.pen.setWidth(self.brushSize)
 
-        painter.setPen(pen)
+        painter.setPen(self.pen)
 
         if prevPoint:
             painter.drawLine(prevPoint, point)
         else:
             painter.drawPoint(point)
 
-    def brushPainter(self, painterx: QtGui.QPainter):
+    def brushPainter(self, painterx: QtGui.QPainter, mousePos: QtCore.QPointF, isDraw: bool):
         painterx.setOpacity(0.4)
         painterx.drawPixmap(0, 0, self.brushMask)
+
+        if mousePos.x() >= 0 and mousePos.x() <= self.brushMask.width() and mousePos.y() >= 0 and mousePos.y() <= self.brushMask.height():
+            if isDraw:
+                self.pen.setColor(QColor(0, 255, 0))
+            else:
+                self.pen.setColor(QColor(255, 255, 255))
+            self.pen.setWidth(self.brushSize) 
+            painterx.setPen(self.pen)
+            painterx.drawPoint(mousePos)
+
         painterx.setOpacity(1)
     
     def addStrokeToHistory(self):

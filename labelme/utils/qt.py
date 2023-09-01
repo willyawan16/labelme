@@ -70,6 +70,7 @@ def newSlider(
     if slot is not None:
         s.valueChanged.connect(slot)
     s.setRange(minValue, maxValue)
+    s.setValue(int((maxValue + minValue) / 2))
     s.setEnabled(enabled)
     return s
 
@@ -85,6 +86,7 @@ def newTextBox(
     if slot is not None:
         t.valueChanged.connect(slot)
     t.setRange(minValue, maxValue)
+    t.setValue(int((maxValue + minValue) / 2))
     t.setSingleStep(step)
     t.setEnabled(enabled)
     return t
