@@ -401,10 +401,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         brushEraseMode = action(
             self.tr("Erase"),
-            lambda: self.toggleBrushMode(True, "erase"),
+            lambda: None,
             None,
             "objects",
             self.tr("Start erasing"),
+            enabled=False,
+        )
+
+        paintBucketTool = action(
+            self.tr("Paint Bucket"),
+            lambda: self.toggleBrushMode(True, "erase"),
+            None,
+            "objects",
+            self.tr("Start Filling"),
             enabled=False,
         )
 
@@ -671,6 +680,7 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode=brushMode,
             brushDrawMode=brushDrawMode,
             brushEraseMode=brushEraseMode,
+            paintBucketTool=paintBucketTool,
             brushSizeSlider=brushSizeSlider,
             brushSizeTextBox=brushSizeTextBox,
             createMode=createMode,
@@ -843,6 +853,7 @@ class MainWindow(QtWidgets.QMainWindow):
             brushMode,
             brushDrawMode,
             brushEraseMode,
+            paintBucketTool,
             brushSizeSlider,
             brushSizeTextBox,
             # brushSizeLayout,
@@ -1099,9 +1110,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if brushMode == "draw":
                 self.actions.brushDrawMode.setEnabled(False)
                 self.actions.brushEraseMode.setEnabled(True)
+                self.actions.paintBucketTool.setEnabled(True)
             elif brushMode == "erase":
                 self.actions.brushDrawMode.setEnabled(True)
                 self.actions.brushEraseMode.setEnabled(False)
+                self.actions.paintBucketTool.setEnabled(False)
             else:
                 raise ValueError("Unsupported brushMode: %s" % brushMode)
         else:
@@ -1110,6 +1123,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushMode.setEnabled(True)
             self.actions.brushDrawMode.setEnabled(False)
             self.actions.brushEraseMode.setEnabled(False)
+            self.actions.paintBucketTool.setEnabled(False)
             self.actions.brushSizeSlider.setEnabled(False)
             self.actions.brushSizeTextBox.setEnabled(False)
             self.actions.undo.setEnabled(self.canvas.isShapeRestorable)
