@@ -1,6 +1,6 @@
 from qtpy import QtCore
 from qtpy import QtGui
-from qtpy.QtGui import QPixmap, QColor, QPen
+from qtpy.QtGui import QImage, QPixmap, QColor, QPainter, QPen
 
 from labelme.logger import logger
 
@@ -13,6 +13,7 @@ class Brush(object):
     def __init__(self):
         self.brushSize = 1
         self.brushMask = QPixmap()
+        self.brushMaskCopy = QImage()
         self.history = []
 
         self.pen = QPen(QColor(0, 255, 0))
@@ -48,7 +49,7 @@ class Brush(object):
         else:
             painter.drawPoint(point)
 
-    def brushPainter(self, painterx: QtGui.QPainter, mousePos: QtCore.QPointF, isDraw: bool):
+    def brushPainter(self, painterx: QPainter, mousePos: QtCore.QPointF, isDraw: bool):
         painterx.setOpacity(0.4)
         painterx.drawPixmap(0, 0, self.brushMask)
 
@@ -75,3 +76,16 @@ class Brush(object):
             self.brushMask = self.history[-1].copy()
         else:
             logger.info("No stroke history...")
+    
+    def fillBucket(self, seedPos: QtCore.QPoint, init = False):
+        if seedPos.x() >= 0 and seedPos.x() <= self.brushMask.width() and seedPos.y() >= 0 and seedPos.y() <= self.brushMask.height():
+            if init:
+                self.brushMaskCopy = self.brushMask.copy().toImage()
+
+            if self.brushMaskCopy.pixelColor[seedPos] == QColor(0, 0, 0):
+                self.brushMaskCopy.setPixelColor(seedPos, QColor(0, 255, 0))
+
+            self.fillBucket(QtCore.QPoint(seedPos.x() - 1, seedPos.y()))
+            self.fillBucket(QtCore.QPoint(seedPos.x() + 1, seedPos.y()))
+            self.fillBucket(QtCore.QPoint(seedPos.x(), seedPos.y() - 1))
+            self.fillBucket(QtCore.QPoint(seedPos.x(), seedPos.y() + 1))
