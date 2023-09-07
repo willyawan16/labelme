@@ -1,5 +1,6 @@
 import gdown
 from qtpy import QtCore
+from PyQt5.QtCore import QTimer, QTime
 from qtpy import QtGui
 from qtpy import QtWidgets
 
@@ -10,6 +11,7 @@ from labelme import QT5
 from labelme.shape import Shape
 import labelme.utils
 import numpy as np
+import cv2 as cv2
 
 
 # TODO(unknown):
@@ -24,12 +26,15 @@ CURSOR_GRAB = QtCore.Qt.OpenHandCursor
 
 MOVE_SPEED = 5.0
 
+# Minimum percentage of pixels of same hue to consider dominant color
+MIN_PIXEL_CNT_PCT = (1.0/20.0)
+
 
 class Canvas(QtWidgets.QWidget):
-
     zoomRequest = QtCore.Signal(int, QtCore.QPoint)
     scrollRequest = QtCore.Signal(int, int)
     newShape = QtCore.Signal()
+    newBrush = QtCore.Signal()
     selectionChanged = QtCore.Signal(list)
     shapeMoved = QtCore.Signal()
     brushMoved = QtCore.Signal()
@@ -47,6 +52,7 @@ class Canvas(QtWidgets.QWidget):
     _fill_drawing = False
 
     def __init__(self, *args, **kwargs):
+        self.start_time = QTime(0, 0, 0)
         self.epsilon = kwargs.pop("epsilon", 10.0)
         self.double_click = kwargs.pop("double_click", "close")
         if self.double_click not in [None, "close"]:
@@ -72,6 +78,7 @@ class Canvas(QtWidgets.QWidget):
         # Initialise local state.
         self.mode = self.EDIT
         self.shapes = []
+        self.brushes = []
         self.shapesBackups = []
         self.current = None
         self.selectedShapes = []  # save the selected shapes here
@@ -101,6 +108,7 @@ class Canvas(QtWidgets.QWidget):
         self.hShapeIsSelected = False
         self._painter = QtGui.QPainter()
         self._cursor = CURSOR_DEFAULT
+        self.drawBoundingBox = False
         # Menus:
         # 0: right-click without selection and dragging of shapes
         # 1: right-click with selection and dragging of shapes
@@ -147,8 +155,11 @@ class Canvas(QtWidgets.QWidget):
     @brushMode.setter
     def brushMode(self, value):
         if value not in [
+            "none",
             "draw",
-            "erase"
+            "erase",
+            "fill",
+            "cancel"
         ]:
             raise ValueError("Unsupported brushMode: %s" % value)
         self._brushMode = value
@@ -762,7 +773,8 @@ class Canvas(QtWidgets.QWidget):
     def paintEvent(self, event):
         if not self.pixmap:
             return super(Canvas, self).paintEvent(event)
-
+        
+        # p for ori layer
         p = self._painter
         p.begin(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -773,6 +785,7 @@ class Canvas(QtWidgets.QWidget):
         p.translate(self.offsetToCenter())
 
         p.drawPixmap(0, 0, self.pixmap)
+
 
         # draw crosshair
         if (
@@ -794,6 +807,21 @@ class Canvas(QtWidgets.QWidget):
                 int(self.prevMovePoint.x()),
                 self.height() - 1,
             )
+        
+        
+        if(self.drawBoundingBox):
+            # r1 = QtGui.QRegion(QtCore.QRect(100, 100, 200, 80), QtGui.QRegion.Ellipse) # r1: elliptic region
+            r2 = QtCore.QRect(100, 120, 90, 30)   # r2: rectangular region
+            # r3 = r1.intersected(r2)        # r3: intersection
+            # brushPixmap = self.brush.brushMaskDraft.copy()
+            # r = self.getBoundingBox()
+            # end_time = QTime.currentTime()
+            # elapsed_time = self.start_time.secsTo(end_time)
+            # logger.info(f"Time taken to get bounding box <<{elapsed_time}>> seconds")
+            
+            # print(r.left(), r.top(), r.width(), r.height())
+            # p.setClipRect(r)
+            self.drawBoundingBox = False
 
         # brush mode here
         if(self.brushing()):
@@ -898,6 +926,10 @@ class Canvas(QtWidgets.QWidget):
         self.setHiding(False)
         self.newShape.emit()
         self.update()
+    
+    def finaliseBrush(self):
+        self.brushes.append(self.brush)
+        self.newBrush.emit()
 
     def closeEnough(self, p1, p2):
         # d = distance(p1 - p2)
@@ -1030,10 +1062,52 @@ class Canvas(QtWidgets.QWidget):
             elif key == QtCore.Qt.Key_Right:
                 self.moveByKeyboard(QtCore.QPointF(MOVE_SPEED, 0.0))
         elif self.brushing():
-            logger.info("Enter Key is called in Brush Mode!")
-            self.getCurrentDrawn()
-            self.update()
+            if key == QtCore.Qt.Key_Return:
+                logger.info("Enter Key is called in Brush Mode!")
+                # self.brush.brushMaskDraft.fill(QtGui.QColor(0, 0, 0))
+                # self.getCurrentDrawn()
+                self.drawBoundingBox = True
+                r = self.getBoundingBox()
+                print("(x y width height): (", r.left(), r.top(), r.width(), r.height(), ")")
+                self.finaliseBrush()
+                self.update()
+                
+    def getBoundingBox(self):
+        self.start_time = QTime.currentTime()
+        brushPixmap = self.brush.brushMaskDraft.copy()
+        image = brushPixmap.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
+        ptr = image.bits()
+        ptr.setsize(image.byteCount())
+        imageArr = np.asarray(ptr).reshape(image.height(), image.width(), 3)
+
+        left = brushPixmap.width()
+        right = 0
+        top = brushPixmap.height()
+        bottom = 0
+        atop = brushPixmap.height()
+
+        for x in range(brushPixmap.width()):
+            for y in range(brushPixmap.height()):
+                pixel_color = QtGui.QColor(image.pixel(x, y))
+                if pixel_color == QtGui.QColor(0, 255, 0):
+                    left = min(left, x)
+                    right = max(right, x)
+                    top = min(top, y)
+                    bottom = max(bottom, y)
+        # for y in range(brushPixmap.height()):
+        #     for x in range(brushPixmap.width()):
+        #         print(imageArr[y, x, :])
+        #     print("next line")
+
+        # for y in range(brushPixmap.height()):
+        #     #print(imageArr[:, y, :]) 
             
+        #     if np.all(imageArr[y, :] != np.array([0, 0, 0])):
+        #         atop = min(atop, y)
+        #         logger.info(f"top: {atop}")
+        #         break
+        
+        return QtCore.QRect(left, top, right - left, bottom - top)
     
     def getCurrentDrawn(self):
         image1 = self.brush.brushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
@@ -1078,6 +1152,12 @@ class Canvas(QtWidgets.QWidget):
         self.shapesBackups.pop()
         self.storeShapes()
         return self.shapes[-1]
+    
+    def setLastLabelForBrush(self, text, flags):
+        assert text
+        self.brushes[-1].label = text
+        self.brushes[-1].flags = flags
+        return self.brushes[-1]
 
     def undoBrushStroke(self):
         logger.info("Undo brush stroke")
