@@ -189,6 +189,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.scrollRequest.connect(self.scrollRequest)
 
         self.canvas.newShape.connect(self.newShape)
+        self.canvas.newBrush.connect(self.newBrush)
         self.canvas.brushMoved.connect(self.setDirty)
         self.canvas.shapeMoved.connect(self.setDirty)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
@@ -1130,8 +1131,53 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushSizeTextBox.setValue(value)
         self.canvas.brush.setSize(value)
     
-    def getBoundingBox(self, pixmap):
-        pass
+    def newBrush(self):
+        """Pop-up and give focus to the label editor.
+
+        position MUST be in global coordinates.
+        """
+        items = self.uniqLabelList.selectedItems()
+        text = None
+        if items:
+            text = items[0].data(Qt.UserRole)
+        flags = {}
+        group_id = None
+        description = ""
+        if self._config["display_label_popup"] or not text:
+            previous_text = self.labelDialog.edit.text()
+            text, flags, group_id, description = self.labelDialog.popUp(text)
+            if not text:
+                self.labelDialog.edit.setText(previous_text)
+
+        if text and not self.validateLabel(text):
+            self.errorMessage(
+                self.tr("Invalid label"),
+                self.tr("Invalid label '{}' with validation type '{}'").format(
+                    text, self._config["validate_label"]
+                ),
+            )
+            text = ""
+        if text:
+            self.labelList.clearSelection()
+            brush = self.canvas.setLastLabelForBrush(text, flags)
+            brush.group_id = group_id
+            brush.description = description
+            self.addLabelFromBrush(brush)
+            logger.info("tes")
+            for i in range(len(self.canvas.brushes)):
+                logger.info(str(self.canvas.brushes[i].pen_color.red()))
+                logger.info(str(self.canvas.brushes[i].pen_color.green()))
+                logger.info(str(self.canvas.brushes[i].pen_color.blue()))
+
+            # self.actions.editMode.setEnabled(True)
+            # self.actions.undoLastPoint.setEnabled(False)
+            # self.actions.undo.setEnabled(True)
+            # self.setDirty()
+            pass
+        else:
+            # self.canvas.undoLastLine()
+            # self.canvas.shapesBackups.pop()
+            pass
 
     # BRUSH RELATED FUNCTIONS -- END
 
@@ -1352,6 +1398,7 @@ class MainWindow(QtWidgets.QMainWindow):
             text = shape.label
         else:
             text = "{} ({})".format(shape.label, shape.group_id)
+
         label_list_item = LabelListWidgetItem(text, shape)
         self.labelList.addItem(label_list_item)
         if self.uniqLabelList.findItemByLabel(shape.label) is None:
@@ -1369,6 +1416,35 @@ class MainWindow(QtWidgets.QMainWindow):
                 html.escape(text), *shape.fill_color.getRgb()[:3]
             )
         )
+
+    def addLabelFromBrush(self, brush):
+        if brush.group_id is None:
+            text = brush.label
+        else:
+            text = "{} ({})".format(brush.label, brush.group_id)
+
+        label_list_item = LabelListWidgetItem(text, brush)
+        self.labelList.addItem(label_list_item)
+        if self.uniqLabelList.findItemByLabel(brush.label) is None:
+            item = self.uniqLabelList.createItemFromLabel(brush.label)
+            self.uniqLabelList.addItem(item)
+            rgb = self._get_rgb_by_label(brush.label)
+            self.uniqLabelList.setItemLabel(item, brush.label, rgb)
+        self.labelDialog.addLabelHistory(brush.label)
+        for action in self.actions.onShapesPresent:
+            action.setEnabled(True)
+
+        self._update_brush_color(brush)
+        label_list_item.setText(
+            '{} <font color="#{:02x}{:02x}{:02x}">●</font>'.format(
+                html.escape(text), *brush.pen_color.getRgb()[:3]
+            )
+        )
+    
+    def _update_brush_color(self, brush):
+        r, g, b = self._get_rgb_by_label(brush.label)
+        brush.pen_color = QtGui.QColor(r, g, b)
+
 
     def _update_shape_color(self, shape):
         r, g, b = self._get_rgb_by_label(shape.label)
