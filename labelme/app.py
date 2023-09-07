@@ -394,7 +394,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Draw"),
             lambda: self.toggleBrushMode(True, "draw"),
             None,
-            "objects",
+            "color-line",
             self.tr("Start painting"),
             enabled=False,
         )
@@ -403,7 +403,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Erase"),
             lambda: self.toggleBrushMode(True, "erase"),
             None,
-            "objects",
+            "delete",
             self.tr("Start erasing"),
             enabled=False,
         )
@@ -412,7 +412,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.tr("Paint Bucket"),
             lambda: self.toggleBrushMode(True, "fill"),
             None,
-            "objects",
+            "color",
             self.tr("Start Filling"),
             enabled=False,
         )
