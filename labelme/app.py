@@ -1089,6 +1089,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def toggleBrushMode(self, brush=True, brushMode="draw"):
         self.canvas.setToBrush(brush)
         self.canvas.brushMode = brushMode
+        self.canvas.prevBrushMask = self.canvas.brush.brushMask.copy()
 
         if brush:
             logger.info("Brush mode: " + brushMode + " activated!")
@@ -1128,6 +1129,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushSizeSlider.setValue(value)
             self.actions.brushSizeTextBox.setValue(value)
         self.canvas.brush.setSize(value)
+    
+    def getBoundingBox(self, pixmap):
+        pass
 
     # BRUSH RELATED FUNCTIONS -- END
 

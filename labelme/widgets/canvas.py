@@ -9,6 +9,7 @@ from labelme.logger import logger
 from labelme import QT5
 from labelme.shape import Shape
 import labelme.utils
+import numpy as np
 
 
 # TODO(unknown):
@@ -112,6 +113,7 @@ class Canvas(QtWidgets.QWidget):
 
         # Brush related
         self.brush = Brush()
+        self.prevBrushMask = QtGui.QPixmap()
 
 
     def fillDrawing(self):
@@ -1032,6 +1034,30 @@ class Canvas(QtWidgets.QWidget):
                 self.moveByKeyboard(QtCore.QPointF(-MOVE_SPEED, 0.0))
             elif key == QtCore.Qt.Key_Right:
                 self.moveByKeyboard(QtCore.QPointF(MOVE_SPEED, 0.0))
+        elif self.brushing():
+            logger.info("Enter Key is called in Brush Mode!")
+            self.getCurrentDrawn()
+            self.update()
+            
+    
+    def getCurrentDrawn(self):
+        image1 = self.brush.brushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
+        image2 = self.prevBrushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
+
+        ptr1 = image1.bits()
+        ptr2 = image2.bits()
+
+        ptr1.setsize(image1.byteCount())
+        ptr2.setsize(image2.byteCount())
+
+        arr1 = np.asarray(ptr1).reshape(image1.height(), image1.width(), 3)
+        arr2 = np.asarray(ptr2).reshape(image2.height(), image2.width(), 3)
+
+        result_image = np.maximum(arr1 - arr2, 0).astype(np.uint8)
+
+        result_pixmap = QtGui.QPixmap.fromImage(QtGui.QImage(result_image.data, result_image.shape[1], result_image.shape[0], result_image.strides[0], QtGui.QImage.Format_RGB888))
+
+        self.brush.brushMask = result_pixmap.copy()
 
     def keyReleaseEvent(self, ev):
         modifiers = ev.modifiers()
