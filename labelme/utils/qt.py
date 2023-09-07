@@ -62,6 +62,7 @@ def newSlider(
         slot=None,
         minValue=0,
         maxValue=10,
+        defaultValue=5,
         orientation=QtCore.Qt.Orientation.Horizontal,
         enabled=True
 ):
@@ -70,7 +71,7 @@ def newSlider(
     if slot is not None:
         s.valueChanged.connect(slot)
     s.setRange(minValue, maxValue)
-    s.setValue(int((maxValue + minValue) / 2))
+    s.setValue(defaultValue)
     s.setEnabled(enabled)
     return s
 
@@ -79,6 +80,7 @@ def newTextBox(
     slot=None,
     minValue=0,
     maxValue=10,
+    defaultValue=5,
     step=1,
     enabled=True
 ):
@@ -86,7 +88,7 @@ def newTextBox(
     if slot is not None:
         t.valueChanged.connect(slot)
     t.setRange(minValue, maxValue)
-    t.setValue(int((maxValue + minValue) / 2))
+    t.setValue(defaultValue)
     t.setSingleStep(step)
     t.setEnabled(enabled)
     return t

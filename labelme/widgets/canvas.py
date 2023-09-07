@@ -146,7 +146,8 @@ class Canvas(QtWidgets.QWidget):
     def brushMode(self, value):
         if value not in [
             "draw",
-            "erase"
+            "erase",
+            "fill"
         ]:
             raise ValueError("Unsupported brushMode: %s" % value)
         self._brushMode = value
@@ -200,7 +201,7 @@ class Canvas(QtWidgets.QWidget):
     def isBrushUndoable(self):
         if not self.brushing():
             return False
-        if len(self.brush.history) < 1:
+        if len(self.brush.history) < 2:
             return False
         return True
 
@@ -350,10 +351,11 @@ class Canvas(QtWidgets.QWidget):
         # Brush
         if self.brushing():
 
-            self.overrideCursor(CURSOR_DRAW)
+            if self.brushMode != "fill":
+                self.overrideCursor(CURSOR_DRAW)
 
-            if QtCore.Qt.LeftButton & ev.buttons():
-                self.brush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
+                if QtCore.Qt.LeftButton & ev.buttons():
+                    self.brush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
             
             self.repaint()
             return
@@ -545,7 +547,10 @@ class Canvas(QtWidgets.QWidget):
                 self.prevPoint = pos
                 self.repaint()
             elif self.brushing():
-                self.brush.drawToBrushCanvas(self.brushMode == "draw", pos)
+                if self.brushMode == "fill":
+                    self.brush.fillBucket(pos)
+                else:
+                    self.brush.drawToBrushCanvas(self.brushMode == "draw", pos)
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -795,7 +800,7 @@ class Canvas(QtWidgets.QWidget):
 
         # brush mode here
         if(self.brushing()):
-            self.brush.brushPainter(p, self.prevMovePoint, self.brushMode == "draw")
+            self.brush.brushPainter(p, self.prevMovePoint, self.brushMode)
         else:
             Shape.scale = self.scale
             for shape in self.shapes:
