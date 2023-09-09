@@ -20,6 +20,9 @@ from qtpy import QtWidgets
 from labelme import __appname__
 from labelme import PY2
 
+from labelme.brush import Brush
+import labelme
+
 from . import utils
 from labelme.ai import MODELS
 from labelme.config import get_config
@@ -194,6 +197,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.shapeMoved.connect(self.setDirty)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
+
+        self.canvas.createBrushClass.connect(self.createBrushClass)
+        self.canvas.toggleOverviewBrush.connect(self.toggleBrushMode)
 
         self.setCentralWidget(scrollArea)
 
@@ -422,18 +428,18 @@ class MainWindow(QtWidgets.QMainWindow):
         brushSizeSlider = slider(
             self.tr("Set brush size"),
             lambda val: self.updateBrushSize(val),
-            minValue=self.canvas.brush.MIN_SIZE,
-            maxValue=self.canvas.brush.MAX_SIZE,
-            defaultValue=self.canvas.brush.DEFAULT_SIZE,
+            minValue=Brush.MIN_SIZE,
+            maxValue=Brush.MAX_SIZE,
+            defaultValue=Brush.DEFAULT_SIZE,
             enabled=False,
         )
 
         textBox = functools.partial(utils.newTextBox, self)
         brushSizeTextBox = textBox(
             lambda val: self.updateBrushSize(val),
-            minValue=self.canvas.brush.MIN_SIZE,
-            maxValue=self.canvas.brush.MAX_SIZE,
-            defaultValue=self.canvas.brush.DEFAULT_SIZE,
+            minValue=Brush.MIN_SIZE,
+            maxValue=Brush.MAX_SIZE,
+            defaultValue=Brush.DEFAULT_SIZE,
             step=1,
             enabled=False
         )
@@ -1074,6 +1080,10 @@ class MainWindow(QtWidgets.QMainWindow):
         url = "https://github.com/wkentaro/labelme/tree/main/examples/tutorial"  # NOQA
         webbrowser.open(url)
 
+    def createBrushClass(self):
+        self.canvas.currentBrush = Brush()
+        self.canvas.currentBrush.initBrushCanvas(self.image.width(), self.image.height())
+
     def toggleDrawingSensitive(self, drawing=True):
         """Toggle drawing sensitive.
 
@@ -1087,10 +1097,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # BRUSH RELATED FUNCTIONS -- START
 
-    def toggleBrushMode(self, brush=True, brushMode="draw"):
-        self.canvas.setToBrush(brush)
+    def toggleBrushMode(self, brush=True, brushMode="none"):
+        if brushMode == "none":
+            self.canvas.setToBrush(brush)
+        else:
+            self.canvas.setToBrushCreate(brush)
+            
         self.canvas.brushMode = brushMode
-        self.canvas.prevBrushMask = self.canvas.brush.brushMask.copy()
+        # self.canvas.prevBrushMask = self.canvas.brush.brushMask.copy()
 
         if brush:
             logger.info("Brush mode: " + brushMode + " activated!")
@@ -1112,6 +1126,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actions.brushDrawMode.setEnabled(brushMode != "draw")
             self.actions.brushEraseMode.setEnabled(brushMode != "erase")
             self.actions.brushFillMode.setEnabled(brushMode != "fill")
+
+            if brushMode is not "none" and not self.canvas.currentBrush:
+                self.createBrushClass()
         else:
             logger.info("Brush mode deactivated!")
 
@@ -1129,7 +1146,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if type(self.actions) is utils.struct:
             self.actions.brushSizeSlider.setValue(value)
             self.actions.brushSizeTextBox.setValue(value)
-        self.canvas.brush.setSize(value)
+        if type(self.canvas.currentBrush) is Brush:
+            self.canvas.currentBrush.setSize(value)
     
     def newBrush(self):
         """Pop-up and give focus to the label editor.
@@ -1444,6 +1462,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _update_brush_color(self, brush):
         r, g, b = self._get_rgb_by_label(brush.label)
         brush.pen_color = QtGui.QColor(r, g, b)
+        mask = brush.brushMaskFinal.createMaskFromColor(labelme.brush.DEFAULT_PEN_COLOR, Qt.MaskOutColor)
+
+        p = QtGui.QPainter(brush.brushMaskFinal)
+        p.setPen(QtGui.QColor(r, g, b))
+        p.drawPixmap(brush.brushMaskFinal.rect(), mask, mask.rect())
+        p.end()
 
 
     def _update_shape_color(self, shape):
@@ -1491,7 +1515,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def loadBrushMask(self):
         data = QtCore.QByteArray.fromBase64(self.labelFile.b64brushMask)
-        self.canvas.brush.brushMask.loadFromData(data, "PNG")
+        self.canvas.currentBrush.brushMask.loadFromData(data, "PNG")
         self.canvas.update()
 
     def loadLabels(self, shapes):
@@ -1541,7 +1565,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.flag_widget.addItem(item)
     
     def pixmap_to_json(self):
-        currentPixmap = self.canvas.brush.brushMask.copy()
+        currentPixmap = self.canvas.currentBrush.brushMask.copy()
         bytes = QtCore.QByteArray()
         buffer = QtCore.QBuffer(bytes)
         buffer.open(QtCore.QIODevice.WriteOnly)
@@ -1904,7 +1928,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         
         # Brush related
-        self.canvas.brush.initBrushCanvas(image.width(), image.height())
+        # self.canvas.currentBrush.initBrushCanvas(image.width(), image.height())
+        self.canvas.canvasBrush.initBrushCanvas(image.width(), image.height())
         if self.labelFile:
             if self.labelFile.b64brushMask is not None:
                 self.loadBrushMask()

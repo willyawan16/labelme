@@ -7,26 +7,27 @@ from labelme.logger import logger
 import time
 import numpy as np
 
-DEFAULT_PEN_COLOR = QColor(0, 255, 0)
-DEFAULT_BG_COLOR = QColor(0, 0, 0)
+DEFAULT_PEN_COLOR = QColor(0, 255, 0, 255)
+DEFAULT_BG_COLOR = QColor(0, 0, 0, 0)
 
 class Brush(object):
+
+    pen_color = DEFAULT_PEN_COLOR
 
     MIN_SIZE = 1
     MAX_SIZE = 256
     DEFAULT_SIZE = 32
     MAX_HISTORY_LEN = 10
 
-    pen_color = DEFAULT_PEN_COLOR
-
     def __init__(
-        self, 
+        self,
         label=None,
         flags=None,
         group_id=None,
         description=None,):
 
-        self.brushSize = 1
+        self.brushSize = self.DEFAULT_SIZE
+        self.brushMaskBG = QPixmap()
         self.brushMaskDraft = QPixmap()
         self.brushMaskCopy = QImage()
         self.history = []
@@ -34,6 +35,11 @@ class Brush(object):
         self.group_id = group_id
         self.flags = flags
         self.description = description
+        self.brushMaskFinal = QPixmap()
+        self.x = 0
+        self.y = 0
+        self.width = 0
+        self.height = 0
 
         self.pen = QPen(DEFAULT_PEN_COLOR)
         self.pen.setCapStyle(QtCore.Qt.PenCapStyle.RoundCap)
@@ -44,6 +50,13 @@ class Brush(object):
     
     def isUndoable(self) -> bool:
         return len(self.history) > 0
+    
+    def setCurrentBrushValue(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.brushMaskFinal = self.brushMaskDraft.copy(x, y, width, height)
 
     # Temporary
     def initBrushCanvas(self, width: int, height: int):
@@ -67,9 +80,19 @@ class Brush(object):
             painter.drawLine(prevPoint, point)
         else:
             painter.drawPoint(point)
+    
+    def pasteToBrushCanvas(self, otherBrushData):
+        painter = QtGui.QPainter(self.brushMaskDraft)
+        logger.info("other brush data:")
+        logger.info(otherBrushData.pen_color.red())
+        logger.info(otherBrushData.pen_color.green())
+        logger.info(otherBrushData.pen_color.blue())
+        # self.pen.setColor(otherBrushData.pen_color)
+        painter.setPen(otherBrushData.pen_color)
+        painter.drawPixmap(otherBrushData.x, otherBrushData.y, otherBrushData.brushMaskFinal)
 
-    def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str):
-        painterx.setOpacity(0.4)
+    def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.4):
+        painterx.setOpacity(opacity)
         painterx.drawPixmap(0, 0, self.brushMaskDraft)
 
         if mode != "fill":
@@ -125,6 +148,7 @@ class Brush(object):
             
             if arr[pos.y(), pos.x(), 1] == 0:
                 arr[pos.y(), pos.x(), 1] = 255
+                arr[pos.y(), pos.x(), 3] = 255
                 processed.add(Brush.pointToTuple(pos))
 
                 for i in range(4):

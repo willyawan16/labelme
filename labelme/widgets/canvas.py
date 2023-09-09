@@ -31,6 +31,7 @@ MIN_PIXEL_CNT_PCT = (1.0/20.0)
 
 
 class Canvas(QtWidgets.QWidget):
+    createBrushClass = QtCore.Signal()
     zoomRequest = QtCore.Signal(int, QtCore.QPoint)
     scrollRequest = QtCore.Signal(int, int)
     newShape = QtCore.Signal()
@@ -39,9 +40,10 @@ class Canvas(QtWidgets.QWidget):
     shapeMoved = QtCore.Signal()
     brushMoved = QtCore.Signal()
     drawingPolygon = QtCore.Signal(bool)
+    toggleOverviewBrush = QtCore.Signal()
     vertexSelected = QtCore.Signal(bool)
 
-    CREATE, EDIT, BRUSH = 0, 1, 2
+    CREATE, EDIT, BRUSH, BRUSHCREATE = 0, 1, 2, 3
 
     # draw, erase
     _brushMode = "draw"
@@ -120,8 +122,10 @@ class Canvas(QtWidgets.QWidget):
         self._ai_model = None
 
         # Brush related
-        self.brush = Brush()
+        self.currentBrush = None
+        self.canvasBrush = Brush()
         self.prevBrushMask = QtGui.QPixmap()
+        self.tmpQRect = None
 
 
     def fillDrawing(self):
@@ -210,9 +214,9 @@ class Canvas(QtWidgets.QWidget):
     
     @property
     def isBrushUndoable(self):
-        if not self.brushing():
+        if not self.brushing() or not self.currentBrush:
             return False
-        if len(self.brush.history) < 2:
+        if len(self.currentBrush.history) < 2:
             return False
         return True
 
@@ -246,8 +250,11 @@ class Canvas(QtWidgets.QWidget):
     def isVisible(self, shape):
         return self.visible.get(shape, True)
 
-    def brushing(self):
+    def overviewBrushing(self):
         return self.mode == self.BRUSH
+    
+    def brushing(self):
+        return self.mode == self.BRUSHCREATE
 
     def drawing(self):
         return self.mode == self.CREATE
@@ -260,6 +267,9 @@ class Canvas(QtWidgets.QWidget):
 
         # Repaint
         pass
+
+    def setToBrushCreate(self, value=True):
+        self.mode = self.BRUSHCREATE if value else self.mode
 
     def setEditing(self, value=True):
         self.mode = self.EDIT if value else self.CREATE
@@ -366,7 +376,7 @@ class Canvas(QtWidgets.QWidget):
                 self.overrideCursor(CURSOR_DRAW)
 
                 if QtCore.Qt.LeftButton & ev.buttons():
-                    self.brush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
+                    self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
             
             self.repaint()
             return
@@ -559,9 +569,10 @@ class Canvas(QtWidgets.QWidget):
                 self.repaint()
             elif self.brushing():
                 if self.brushMode == "fill":
-                    self.brush.fillBucket(pos)
+                        self.currentBrush.fillBucket(pos)
                 else:
-                    self.brush.drawToBrushCanvas(self.brushMode == "draw", pos)
+                    self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos)
+                
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -595,7 +606,7 @@ class Canvas(QtWidgets.QWidget):
                         [x for x in self.selectedShapes if x != self.hShape]
                     )
             elif self.brushing():
-                self.brush.addStrokeToHistory()
+                self.currentBrush.addStrokeToHistory()
                 self.brushMoved.emit()
 
         if self.movingShape and self.hShape:
@@ -823,12 +834,23 @@ class Canvas(QtWidgets.QWidget):
             # logger.info(f"Time taken to get bounding box <<{elapsed_time}>> seconds")
             
             # print(r.left(), r.top(), r.width(), r.height())
-            # p.setClipRect(r)
-            self.drawBoundingBox = False
+            print()
+            p.setClipRect(self.tmpQRect)
 
         # brush mode here
-        if(self.brushing()):
-            self.brush.brushPainter(p, self.prevMovePoint, self.brushMode)
+        if self.brushing():
+            if(not self.drawBoundingBox):
+                for brush in self.brushes:
+                    self.canvasBrush.pasteToBrushCanvas(brush)
+                    pass
+                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.2)
+            if self.currentBrush:
+                self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
+        elif self.overviewBrushing():
+            for brush in self.brushes:
+                self.canvasBrush.pasteToBrushCanvas(brush)
+                pass
+            self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
         else:
             Shape.scale = self.scale
             for shape in self.shapes:
@@ -931,8 +953,11 @@ class Canvas(QtWidgets.QWidget):
         self.update()
     
     def finaliseBrush(self):
-        self.brushes.append(self.brush)
+        self.brushes.append(self.currentBrush)
         self.newBrush.emit()
+        self.currentBrush = None
+        self.toggleOverviewBrush.emit()
+        self.drawBoundingBox = False
 
     def closeEnough(self, p1, p2):
         # d = distance(p1 - p2)
@@ -1065,19 +1090,24 @@ class Canvas(QtWidgets.QWidget):
             elif key == QtCore.Qt.Key_Right:
                 self.moveByKeyboard(QtCore.QPointF(MOVE_SPEED, 0.0))
         elif self.brushing():
-            if key == QtCore.Qt.Key_Return:
+            if key == QtCore.Qt.Key_Escape and self._brushMode != "none":
+                self.currentBrush = None
+                self.toggleOverviewBrush.emit()
+                self.update()
+            elif key == QtCore.Qt.Key_Return and self._brushMode != "none":
                 logger.info("Enter Key is called in Brush Mode!")
                 # self.brush.brushMaskDraft.fill(QtGui.QColor(0, 0, 0))
                 # self.getCurrentDrawn()
                 self.drawBoundingBox = True
-                r = self.getBoundingBox()
-                print("(x y width height): (", r.left(), r.top(), r.width(), r.height(), ")")
+                self.tmpQRect = self.getBoundingBox()
+                print("(x y width height): (", self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height(), ")")
+                self.currentBrush.setCurrentBrushValue(self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height())
                 self.finaliseBrush()
                 self.update()
                 
     def getBoundingBox(self):
         self.start_time = QTime.currentTime()
-        brushPixmap = self.brush.brushMaskDraft.copy()
+        brushPixmap = self.currentBrush.brushMaskDraft.copy()
         image = brushPixmap.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
         ptr = image.bits()
         ptr.setsize(image.byteCount())
@@ -1113,7 +1143,7 @@ class Canvas(QtWidgets.QWidget):
         return QtCore.QRect(left, top, right - left, bottom - top)
     
     def getCurrentDrawn(self):
-        image1 = self.brush.brushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
+        image1 = self.currentBrush.brushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
         image2 = self.prevBrushMask.toImage().convertToFormat(QtGui.QImage.Format.Format_RGB888)
 
         ptr1 = image1.bits()
@@ -1129,7 +1159,7 @@ class Canvas(QtWidgets.QWidget):
 
         result_pixmap = QtGui.QPixmap.fromImage(QtGui.QImage(result_image.data, result_image.shape[1], result_image.shape[0], result_image.strides[0], QtGui.QImage.Format_RGB888))
 
-        self.brush.brushMask = result_pixmap.copy()
+        self.currentBrush.brushMask = result_pixmap.copy()
 
     def keyReleaseEvent(self, ev):
         modifiers = ev.modifiers()
@@ -1164,7 +1194,7 @@ class Canvas(QtWidgets.QWidget):
 
     def undoBrushStroke(self):
         logger.info("Undo brush stroke")
-        self.brush.undoStroke()
+        self.currentBrush.undoStroke()
         self.update()
 
     def undoLastLine(self):
