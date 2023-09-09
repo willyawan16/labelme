@@ -123,43 +123,34 @@ class Brush(object):
     def fillBucket(self, seedPos: QPoint):
         startTime = time.time()
 
+        print(seedPos.x(), ", ", seedPos.y())
+
         img = self.brushMaskDraft.toImage()
         ptr = img.bits()
         ptr.setsize(img.byteCount())
+        w, h = img.width(), img.height()
 
-        arr = np.asarray(ptr).reshape(img.height(), img.width(), 4)
+        arr = np.asarray(ptr).reshape(h, w, 4)
 
-        if type(seedPos) is QPointF:
-            seedPos = QPoint(int(seedPos.x()), int(seedPos.y()))
-        stack = []
-        processed = set()
-        stack.append(seedPos)
-        xIt = [-1, 1, 0, 0]
-        yIt = [0, 0, -1, 1]
+        have_seen = set()
+        queue = [(int(seedPos.x()), int(seedPos.y()))]
 
-        print(seedPos.x(), ", ", seedPos.y())
+        def get_points(have_seen, pos):
+            points = []
+            cx, cy = pos
+            for x, y in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                xx, yy = cx + x, cy + y
+                if xx >= 0 and xx < w and yy >= 0 and yy < h and (xx, yy) not in have_seen:
+                    points.append((xx, yy))
+                    have_seen.add((xx, yy))
+            return points
 
-        while len(stack) > 0:
-            pos = stack.pop(0)
-
-            condition = pos.x() >= 0 and pos.x() < img.width() and pos.y() >= 0 and pos.y() < img.height()
-            if not condition:
-                continue
-            
-            if arr[pos.y(), pos.x(), 1] == 0:
-                arr[pos.y(), pos.x(), 1] = 255
-                arr[pos.y(), pos.x(), 3] = 255
-                processed.add(Brush.pointToTuple(pos))
-
-                for i in range(4):
-                    ipos = QPoint(pos.x() + xIt[i], pos.y() + yIt[i])
-                    if not (Brush.pointToTuple(ipos) in processed):
-                        stack.append(ipos)
+        while queue:
+            x, y = queue.pop()
+            if arr[y, x, 1] == 0:
+                arr[y, x, 1] = 255
+                queue[0:0] = get_points(have_seen, (x, y))
 
         self.brushMaskDraft = QPixmap().fromImage(img)
 
         logger.info("Time taken: " + str(time.time() - startTime))
-    
-    @staticmethod
-    def pointToTuple(point: QPoint):
-        return tuple([point.x(), point.y()])
