@@ -174,6 +174,7 @@ class Brush(object):
             x, y = queue.pop()
             if arr[y, x, 1] == 0:
                 arr[y, x, 1] = 255
+                arr[y, x, 3] = 255
                 queue[0:0] = get_points(have_seen, (x, y))
 
         self.brushMaskDraft = QPixmap().fromImage(img)
