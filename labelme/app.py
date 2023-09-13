@@ -1929,7 +1929,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Brush related
         # self.canvas.currentBrush.initBrushCanvas(image.width(), image.height())
-        self.canvas.canvasBrush.initBrushCanvas(image.width(), image.height())
+        self.canvas.canvasBrush.initBrushCanvas(image.width(), image.height(), False)
         if self.labelFile:
             if self.labelFile.b64brushMask is not None:
                 self.loadBrushMask()

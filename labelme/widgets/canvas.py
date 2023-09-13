@@ -568,11 +568,15 @@ class Canvas(QtWidgets.QWidget):
                 self.prevPoint = pos
                 self.repaint()
             elif self.brushing():
+
                 if self.brushMode == "fill":
                         self.currentBrush.fillBucket(pos)
                 else:
                     self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos)
-                
+
+                if self.brushMode != "none":
+                    self.currentBrush.updateBoundingBox(pos)
+
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -1099,7 +1103,7 @@ class Canvas(QtWidgets.QWidget):
                 # self.brush.brushMaskDraft.fill(QtGui.QColor(0, 0, 0))
                 # self.getCurrentDrawn()
                 self.drawBoundingBox = True
-                self.tmpQRect = self.getBoundingBox()
+                self.tmpQRect = self.currentBrush.getBoundingBox()
                 print("(x y width height): (", self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height(), ")")
                 self.currentBrush.setCurrentBrushValue(self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height())
                 self.finaliseBrush()
@@ -1117,7 +1121,6 @@ class Canvas(QtWidgets.QWidget):
         right = 0
         top = brushPixmap.height()
         bottom = 0
-        atop = brushPixmap.height()
 
         for x in range(brushPixmap.width()):
             for y in range(brushPixmap.height()):

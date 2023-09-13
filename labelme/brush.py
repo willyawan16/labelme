@@ -40,6 +40,11 @@ class Brush(object):
         self.y = 0
         self.width = 0
         self.height = 0
+        
+        self.left = 0
+        self.right = 0
+        self.top = 0
+        self.bottom = 0
 
         self.pen = QPen(DEFAULT_PEN_COLOR)
         self.pen.setCapStyle(QtCore.Qt.PenCapStyle.RoundCap)
@@ -59,9 +64,29 @@ class Brush(object):
         self.brushMaskFinal = self.brushMaskDraft.copy(x, y, width, height)
 
     # Temporary
-    def initBrushCanvas(self, width: int, height: int):
+    def initBrushCanvas(self, width: int, height: int, initBoundary: bool = True):
         self.brushMaskDraft = QPixmap(width, height)
         self.brushMaskDraft.fill(DEFAULT_BG_COLOR)
+        if initBoundary:
+            self.left = width
+            self.right = 0
+            self.top = height
+            self.bottom = 0
+
+    def updateBoundingBox(self, currentPoint: QPointF):
+        halfBrushSize = self.brushSize / 2
+        xMin = currentPoint.x() - halfBrushSize
+        xMax = currentPoint.x() + halfBrushSize
+        yMin = currentPoint.y() - halfBrushSize
+        yMax = currentPoint.y() + halfBrushSize
+
+        self.left = min(self.left, xMin)
+        self.right = max(self.right, xMax)
+        self.top = min(self.top, yMin)
+        self.bottom = max(self.bottom, yMax)
+    
+    def getBoundingBox(self):
+        return QtCore.QRect(self.left, self.top, self.right - self.left, self.bottom - self.top)
 
     def drawToBrushCanvas(self, isDraw, point, prevPoint=None):
         painter = QtGui.QPainter(self.brushMaskDraft)
