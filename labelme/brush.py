@@ -73,7 +73,7 @@ class Brush(object):
             self.top = height
             self.bottom = 0
 
-    def updateBoundingBox(self, currentPoint: QPointF):
+    def updateBoundingBox(self, currentPoint: QPoint):
         halfBrushSize = self.brushSize / 2
         xMin = currentPoint.x() - halfBrushSize
         xMax = currentPoint.x() + halfBrushSize
@@ -86,7 +86,7 @@ class Brush(object):
         self.bottom = max(self.bottom, yMax)
     
     def getBoundingBox(self):
-        return QtCore.QRect(self.left, self.top, self.right - self.left, self.bottom - self.top)
+        return QtCore.QRect(int(self.left), int(self.top), int(self.right - self.left), int(self.bottom - self.top))
 
     def drawToBrushCanvas(self, isDraw, point, prevPoint=None):
         painter = QtGui.QPainter(self.brushMaskDraft)
@@ -120,7 +120,7 @@ class Brush(object):
         painterx.setOpacity(opacity)
         painterx.drawPixmap(0, 0, self.brushMaskDraft)
 
-        if mode != "fill":
+        if mode in ("draw", "erase"):
             if mousePos.x() >= 0 and mousePos.x() <= self.brushMaskDraft.width() and mousePos.y() >= 0 and mousePos.y() <= self.brushMaskDraft.height():
                 if mode == "draw":
                     self.pen.setColor(self.pen_color)
@@ -176,6 +176,7 @@ class Brush(object):
                 arr[y, x, 1] = 255
                 arr[y, x, 3] = 255
                 queue[0:0] = get_points(have_seen, (x, y))
+                self.updateBoundingBox(QPoint(x, y))
 
         self.brushMaskDraft = QPixmap().fromImage(img)
 
