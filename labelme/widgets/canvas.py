@@ -11,7 +11,6 @@ from labelme import QT5
 from labelme.shape import Shape
 import labelme.utils
 import numpy as np
-import cv2 as cv2
 
 
 # TODO(unknown):

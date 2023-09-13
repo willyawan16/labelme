@@ -416,7 +416,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         brushFillMode = action(
-            self.tr("Paint Bucket"),
+            self.tr("Fill"),
             lambda: self.toggleBrushMode(True, "fill"),
             None,
             "color",
