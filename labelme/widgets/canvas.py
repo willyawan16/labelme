@@ -376,6 +376,7 @@ class Canvas(QtWidgets.QWidget):
 
                 if QtCore.Qt.LeftButton & ev.buttons():
                     self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos, prevPoint)
+                    self.currentBrush.updateBoundingBox(pos)
             
             self.repaint()
             return
@@ -572,8 +573,6 @@ class Canvas(QtWidgets.QWidget):
                         self.currentBrush.fillBucket(pos)
                 else:
                     self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos)
-
-                if self.brushMode != "none":
                     self.currentBrush.updateBoundingBox(pos)
 
                 self.repaint()
@@ -588,6 +587,11 @@ class Canvas(QtWidgets.QWidget):
             self.prevPoint = pos
 
     def mouseReleaseEvent(self, ev):
+        if QT5:
+            pos = self.transformPos(ev.localPos())
+        else:
+            pos = self.transformPos(ev.posF())
+            
         if ev.button() == QtCore.Qt.RightButton:
             menu = self.menus[len(self.selectedShapesCopy) > 0]
             self.restoreCursor()
@@ -610,6 +614,7 @@ class Canvas(QtWidgets.QWidget):
                     )
             elif self.brushing():
                 self.currentBrush.addStrokeToHistory()
+                self.currentBrush.updateBoundingBox(pos)
                 self.brushMoved.emit()
 
         if self.movingShape and self.hShape:
