@@ -9,6 +9,7 @@ import numpy as np
 
 DEFAULT_PEN_COLOR = QColor(0, 255, 0, 255)
 DEFAULT_BG_COLOR = QColor(0, 0, 0, 0)
+WHITE_COLOR = QColor(255, 255, 255)
 
 class Brush(object):
 
@@ -85,6 +86,12 @@ class Brush(object):
         self.top = min(self.top, yMin)
         self.bottom = max(self.bottom, yMax)
     
+    def updateBoundingBoxWhileFilling(self, x, y):
+        self.left = min(self.left, x)
+        self.right = max(self.right, x)
+        self.top = min(self.top, y)
+        self.bottom = max(self.bottom, y)
+    
     def getBoundingBox(self):
         return QtCore.QRect(int(self.left), int(self.top), int(self.right - self.left), int(self.bottom - self.top))
 
@@ -96,7 +103,6 @@ class Brush(object):
         else:
             self.pen.setColor(DEFAULT_BG_COLOR)
         
-        #penWidths = [8, 16, 32, 64, 128, 256]
         self.pen.setWidth(self.brushSize)
 
         painter.setPen(self.pen)
@@ -112,9 +118,10 @@ class Brush(object):
         logger.info(otherBrushData.pen_color.red())
         logger.info(otherBrushData.pen_color.green())
         logger.info(otherBrushData.pen_color.blue())
-        # self.pen.setColor(otherBrushData.pen_color)
+        painter.setOpacity(0.2)
         painter.setPen(otherBrushData.pen_color)
         painter.drawPixmap(otherBrushData.x, otherBrushData.y, otherBrushData.brushMaskFinal)
+        painter.setOpacity(1)
 
     def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.4):
         painterx.setOpacity(opacity)
@@ -125,7 +132,7 @@ class Brush(object):
                 if mode == "draw":
                     self.pen.setColor(self.pen_color)
                 else:
-                    self.pen.setColor(QColor(255, 255, 255))
+                    self.pen.setColor(WHITE_COLOR)
                 self.pen.setWidth(self.brushSize) 
                 painterx.setPen(self.pen)
                 painterx.drawPoint(mousePos)
@@ -176,7 +183,7 @@ class Brush(object):
                 arr[y, x, 1] = 255
                 arr[y, x, 3] = 255
                 queue[0:0] = get_points(have_seen, (x, y))
-                self.updateBoundingBox(QPoint(x, y))
+                self.updateBoundingBoxWhileFilling(x, y)
 
         self.brushMaskDraft = QPixmap().fromImage(img)
 

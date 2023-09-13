@@ -829,35 +829,21 @@ class Canvas(QtWidgets.QWidget):
                 int(self.prevMovePoint.x()),
                 self.height() - 1,
             )
-        
-        
-        if(self.drawBoundingBox):
-            # r1 = QtGui.QRegion(QtCore.QRect(100, 100, 200, 80), QtGui.QRegion.Ellipse) # r1: elliptic region
-            r2 = QtCore.QRect(100, 120, 90, 30)   # r2: rectangular region
-            # r3 = r1.intersected(r2)        # r3: intersection
-            # brushPixmap = self.brush.brushMaskDraft.copy()
-            # r = self.getBoundingBox()
-            # end_time = QTime.currentTime()
-            # elapsed_time = self.start_time.secsTo(end_time)
-            # logger.info(f"Time taken to get bounding box <<{elapsed_time}>> seconds")
-            
-            # print(r.left(), r.top(), r.width(), r.height())
-            print()
-            p.setClipRect(self.tmpQRect)
 
         # brush mode here
         if self.brushing():
             if(not self.drawBoundingBox):
+                logger.info( "awaw1" )
                 for brush in self.brushes:
                     self.canvasBrush.pasteToBrushCanvas(brush)
-                    pass
                 self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.2)
             if self.currentBrush:
+                logger.info( "awaw2" )
                 self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
         elif self.overviewBrushing():
+            logger.info( "awaw3" )
             for brush in self.brushes:
                 self.canvasBrush.pasteToBrushCanvas(brush)
-                pass
             self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
         else:
             Shape.scale = self.scale
