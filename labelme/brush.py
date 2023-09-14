@@ -8,6 +8,7 @@ import time
 import numpy as np
 
 DEFAULT_PEN_COLOR = QColor(0, 255, 0, 255)
+DEFAULT_ERASER_COLOR = QColor(0, 0, 0, 255)
 DEFAULT_BG_COLOR = QColor(0, 0, 0, 0)
 WHITE_COLOR = QColor(255, 255, 255)
 
@@ -96,12 +97,13 @@ class Brush(object):
         return QtCore.QRect(int(self.left), int(self.top), int(self.right - self.left), int(self.bottom - self.top))
 
     def drawToBrushCanvas(self, isDraw, point, prevPoint=None):
-        painter = QtGui.QPainter(self.brushMaskDraft)
+        painter = QPainter(self.brushMaskDraft)
 
         if isDraw:
             self.pen.setColor(self.pen_color)
         else:
-            self.pen.setColor(DEFAULT_BG_COLOR)
+            painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationOut)
+            self.pen.setColor(DEFAULT_ERASER_COLOR)
         
         self.pen.setWidth(self.brushSize)
 
@@ -114,16 +116,12 @@ class Brush(object):
     
     def pasteToBrushCanvas(self, otherBrushData):
         painter = QtGui.QPainter(self.brushMaskDraft)
-        logger.info("other brush data:")
-        logger.info(otherBrushData.pen_color.red())
-        logger.info(otherBrushData.pen_color.green())
-        logger.info(otherBrushData.pen_color.blue())
         painter.setOpacity(0.2)
         painter.setPen(otherBrushData.pen_color)
         painter.drawPixmap(otherBrushData.x, otherBrushData.y, otherBrushData.brushMaskFinal)
         painter.setOpacity(1)
 
-    def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.4):
+    def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.6):
         painterx.setOpacity(opacity)
         painterx.drawPixmap(0, 0, self.brushMaskDraft)
 

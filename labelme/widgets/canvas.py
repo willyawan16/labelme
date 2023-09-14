@@ -833,15 +833,12 @@ class Canvas(QtWidgets.QWidget):
         # brush mode here
         if self.brushing():
             if(not self.drawBoundingBox):
-                logger.info( "awaw1" )
                 for brush in self.brushes:
                     self.canvasBrush.pasteToBrushCanvas(brush)
                 self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.2)
             if self.currentBrush:
-                logger.info( "awaw2" )
                 self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
         elif self.overviewBrushing():
-            logger.info( "awaw3" )
             for brush in self.brushes:
                 self.canvasBrush.pasteToBrushCanvas(brush)
             self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
@@ -1090,8 +1087,6 @@ class Canvas(QtWidgets.QWidget):
                 self.update()
             elif key == QtCore.Qt.Key_Return and self._brushMode != "none":
                 logger.info("Enter Key is called in Brush Mode!")
-                # self.brush.brushMaskDraft.fill(QtGui.QColor(0, 0, 0))
-                # self.getCurrentDrawn()
                 self.drawBoundingBox = True
                 self.tmpQRect = self.currentBrush.getBoundingBox()
                 print("(x y width height): (", self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height(), ")")
