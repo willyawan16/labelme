@@ -833,12 +833,14 @@ class Canvas(QtWidgets.QWidget):
         # brush mode here
         if self.brushing():
             if(not self.drawBoundingBox):
+                self.canvasBrush.resetCanvasDraft()
                 for brush in self.brushes:
                     self.canvasBrush.pasteToBrushCanvas(brush)
                 self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.2)
             if self.currentBrush:
                 self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
         elif self.overviewBrushing():
+            self.canvasBrush.resetCanvasDraft()
             for brush in self.brushes:
                 self.canvasBrush.pasteToBrushCanvas(brush)
             self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode)

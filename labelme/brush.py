@@ -114,9 +114,13 @@ class Brush(object):
         else:
             painter.drawPoint(point)
     
+    def resetCanvasDraft(self):
+        self.brushMaskDraft.fill(DEFAULT_BG_COLOR)
+    
     def pasteToBrushCanvas(self, otherBrushData):
         painter = QtGui.QPainter(self.brushMaskDraft)
-        painter.setOpacity(0.2)
+        painter.setOpacity(0.6)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Plus)
         painter.setPen(otherBrushData.pen_color)
         painter.drawPixmap(otherBrushData.x, otherBrushData.y, otherBrushData.brushMaskFinal)
         painter.setOpacity(1)
