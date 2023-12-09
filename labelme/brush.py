@@ -6,6 +6,7 @@ from qtpy.QtCore import QPoint, QPointF
 from labelme.logger import logger
 import time
 import numpy as np
+import random, string
 
 DEFAULT_PEN_COLOR = QColor(0, 255, 0, 255)
 DEFAULT_ERASER_COLOR = QColor(0, 0, 0, 255)
@@ -38,6 +39,7 @@ class Brush(object):
         self.flags = flags
         self.description = description
         self.brushMaskFinal = QPixmap()
+        self.brushId = -1
         self.x = 0
         self.y = 0
         self.width = 0
@@ -63,6 +65,7 @@ class Brush(object):
         self.y = y
         self.width = width
         self.height = height
+        self.brushId = ''.join(random.sample(string.ascii_letters+string.digits, 15))
         self.brushMaskFinal = self.brushMaskDraft.copy(x, y, width, height)
 
     # Temporary
@@ -190,3 +193,12 @@ class Brush(object):
         self.brushMaskDraft = QPixmap().fromImage(img)
 
         logger.info("Time taken: " + str(time.time() - startTime))
+
+    def moveBy(self, offset: QPoint):
+        self.x += int(offset.x())
+        self.y += int(offset.y())
+        self.left += int(offset.x())
+        self.right += int(offset.x())
+        self.top += int(offset.y())
+        self.bottom += int(offset.y())
+        print(self.x, self.y)

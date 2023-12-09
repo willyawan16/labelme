@@ -125,6 +125,7 @@ class Canvas(QtWidgets.QWidget):
         self.canvasBrush = Brush()
         self.prevBrushMask = QtGui.QPixmap()
         self.tmpQRect = None
+        self.hBrushId = None
 
 
     def fillDrawing(self):
@@ -380,6 +381,35 @@ class Canvas(QtWidgets.QWidget):
             
             self.repaint()
             return
+        
+        if self.overviewBrushing():
+            if QtCore.Qt.LeftButton & ev.buttons():
+                if self.hBrushId is not None:
+                    self.overrideCursor(CURSOR_MOVE)
+                    self.boundedMoveBrush(self.brushes, pos, prevPoint)
+                    self.repaint()
+                return 
+
+            # hovering brush on canvas
+            for brush in reversed([s for s in self.brushes]):
+                # check whether current pixel has color
+                newPosX = pos.x() - brush.left
+                newPosY = pos.y() - brush.top
+                if(
+                    newPosX > 0 
+                    and newPosX < brush.width 
+                    and newPosY > 0 
+                    and newPosY < brush.height 
+                    and brush.brushMaskFinal.toImage().pixel(newPosX, newPosY)
+                ):
+                    # found a brush
+                    self.hBrushId = brush.brushId
+                    self.overrideCursor(CURSOR_POINT)
+                    break
+                self.hBrushId = None
+
+            self.repaint()    
+            return 
 
         # Polygon copy moving.
         if QtCore.Qt.RightButton & ev.buttons():
@@ -574,6 +604,7 @@ class Canvas(QtWidgets.QWidget):
                 else:
                     self.currentBrush.drawToBrushCanvas(self.brushMode == "draw", pos)
                     self.currentBrush.updateBoundingBox(pos)
+                self.prevPoint = pos
 
                 self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
@@ -748,6 +779,18 @@ class Canvas(QtWidgets.QWidget):
             self.prevPoint = pos
             return True
         return False
+    
+    def boundedMoveBrush(self, chosenBrushes, pos, prevPoint):
+        if self.outOfPixmap(pos):
+            return False
+        dp = QtCore.QPoint(int(pos.x()) - int(prevPoint.x()), int(pos.y()) - int(prevPoint.y()))
+        if dp:
+            for brush in chosenBrushes:
+                if brush.brushId == self.hBrushId:
+                    brush.moveBy(dp)
+            self.prevPoint = pos
+            return True
+        return False
 
     def deSelectShape(self):
         if self.selectedShapes:
@@ -832,7 +875,7 @@ class Canvas(QtWidgets.QWidget):
 
         # brush mode here
         if self.brushing():
-            if(not self.drawBoundingBox):
+            if(not self.drawBoundingBox): # has pressed enter?
                 self.canvasBrush.resetCanvasDraft()
                 for brush in self.brushes:
                     self.canvasBrush.pasteToBrushCanvas(brush)
@@ -842,8 +885,9 @@ class Canvas(QtWidgets.QWidget):
         elif self.overviewBrushing():
             self.canvasBrush.resetCanvasDraft()
             for brush in self.brushes:
+                self.canvasBrush.resetCanvasDraft()
                 self.canvasBrush.pasteToBrushCanvas(brush)
-            self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
+                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 1.0 if (self.hBrushId is not None and brush.brushId == self.hBrushId) else 0.6 )
         else:
             Shape.scale = self.scale
             for shape in self.shapes:
