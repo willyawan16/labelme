@@ -23,6 +23,7 @@ class ImageList(QtWidgets.QWidget):
             return toolbar
 
         self.layout = QtWidgets.QVBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self.layout)
 
         self.tools = toolbar("Tools")

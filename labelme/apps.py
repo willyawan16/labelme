@@ -43,7 +43,7 @@ class TableWidget(QtWidgets.QWidget):
 
         # Create second tab
         self.tab2.layout = QtWidgets.QVBoxLayout(self)
-        self.annotation = Annotation(self, config)
+        self.annotation = Annotation(self, config, filename)
         self.tab2.layout.addWidget(self.annotation)
         self.tab2.setLayout(self.tab2.layout)
         
