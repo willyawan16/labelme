@@ -8,6 +8,8 @@ import time
 import numpy as np
 import random, string
 
+import copy
+
 DEFAULT_PEN_COLOR = QColor(0, 255, 0, 255)
 DEFAULT_ERASER_COLOR = QColor(0, 0, 0, 255)
 DEFAULT_BG_COLOR = QColor(0, 0, 0, 0)
@@ -21,6 +23,7 @@ class Brush(object):
     MAX_SIZE = 256
     DEFAULT_SIZE = 32
     MAX_HISTORY_LEN = 10
+    DEFAULT_OPACITY = 0.82
 
     def __init__(
         self,
@@ -39,11 +42,11 @@ class Brush(object):
         self.flags = flags
         self.description = description
         self.brushMaskFinal = QPixmap()
-        self.brushId = -1
         self.x = 0
         self.y = 0
         self.width = 0
         self.height = 0
+        self.opacity = self.DEFAULT_OPACITY
         
         self.left = 0
         self.right = 0
@@ -60,12 +63,12 @@ class Brush(object):
     def isUndoable(self) -> bool:
         return len(self.history) > 0
     
+    
     def setCurrentBrushValue(self, x, y, width, height):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
-        self.brushId = ''.join(random.sample(string.ascii_letters+string.digits, 15))
         self.brushMaskFinal = self.brushMaskDraft.copy(x, y, width, height)
 
     # Temporary
@@ -128,9 +131,9 @@ class Brush(object):
         painter.drawPixmap(otherBrushData.x, otherBrushData.y, otherBrushData.brushMaskFinal)
         painter.setOpacity(1)
 
-    def brushPainter(self, painterx: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.6):
-        painterx.setOpacity(opacity)
-        painterx.drawPixmap(0, 0, self.brushMaskDraft)
+    def brushPainter(self, currentPainter: QPainter, mousePos: QPointF, mode: str, opacity: float = 0.6):
+        currentPainter.setOpacity(opacity)
+        currentPainter.drawPixmap(0, 0, self.brushMaskDraft)
 
         if mode in ("draw", "erase"):
             if mousePos.x() >= 0 and mousePos.x() <= self.brushMaskDraft.width() and mousePos.y() >= 0 and mousePos.y() <= self.brushMaskDraft.height():
@@ -139,10 +142,10 @@ class Brush(object):
                 else:
                     self.pen.setColor(WHITE_COLOR)
                 self.pen.setWidth(self.brushSize) 
-                painterx.setPen(self.pen)
-                painterx.drawPoint(mousePos)
+                currentPainter.setPen(self.pen)
+                currentPainter.drawPoint(mousePos)
 
-        painterx.setOpacity(1)
+        currentPainter.setOpacity(1)
     
     def addStrokeToHistory(self):
         logger.info("Add stroke history")
@@ -201,4 +204,7 @@ class Brush(object):
         self.right += int(offset.x())
         self.top += int(offset.y())
         self.bottom += int(offset.y())
-        print(self.x, self.y)
+        # print(self.x, self.y)
+    
+    def copy(self):
+        return copy.copy(self)

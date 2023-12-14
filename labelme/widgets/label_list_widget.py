@@ -68,10 +68,10 @@ class HTMLDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class LabelListWidgetItem(QtGui.QStandardItem):
-    def __init__(self, text=None, shape=None):
+    def __init__(self, text=None, object=None):
         super(LabelListWidgetItem, self).__init__()
         self.setText(text or "")
-        self.setShape(shape)
+        self.setObject(object)
 
         self.setCheckable(True)
         self.setCheckState(Qt.Checked)
@@ -79,12 +79,12 @@ class LabelListWidgetItem(QtGui.QStandardItem):
         self.setTextAlignment(Qt.AlignBottom)
 
     def clone(self):
-        return LabelListWidgetItem(self.text(), self.shape())
+        return LabelListWidgetItem(self.text(), self.object())
 
-    def setShape(self, shape):
+    def setObject(self, shape):
         self.setData(shape, Qt.UserRole)
 
-    def shape(self):
+    def object(self):
         return self.data(Qt.UserRole)
 
     def __hash__(self):
@@ -177,9 +177,16 @@ class LabelListWidget(QtWidgets.QListView):
     def findItemByShape(self, shape):
         for row in range(self.model().rowCount()):
             item = self.model().item(row, 0)
-            if item.shape() == shape:
+            if item.object() == shape:
                 return item
         raise ValueError("cannot find shape: {}".format(shape))
+    
+    def findItemByBrush(self, brush):
+        for row in range(self.model().rowCount()):
+            item = self.model().item(row, 0)
+            if item.object() == brush:
+                return item
+        raise ValueError("cannot find brush: {}".format(brush))
 
     def clear(self):
         self.model().clear()

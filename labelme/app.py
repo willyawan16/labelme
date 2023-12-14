@@ -31,6 +31,7 @@ from labelme.label_file import LabelFileError
 from labelme.logger import logger
 from labelme.shape import Shape
 from labelme.widgets import BrightnessContrastDialog
+from labelme.widgets import BrushOptionsDialog
 from labelme.widgets import Canvas
 from labelme.widgets import FileDialogPreview
 from labelme.widgets import LabelDialog
@@ -102,6 +103,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._noSelectionSlot = False
 
         self._copied_shapes = None
+
+        self._copied_brushes = None
 
         # Main widgets and related state.
         self.labelDialog = LabelDialog(
@@ -195,7 +198,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.newBrush.connect(self.newBrush)
         self.canvas.brushMoved.connect(self.setDirty)
         self.canvas.shapeMoved.connect(self.setDirty)
-        self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
+        self.canvas.selectionChanged.connect(self.objectSelectionChanged)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
 
         self.canvas.createBrushClass.connect(self.createBrushClass)
@@ -460,7 +463,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         delete = action(
             self.tr("Delete Polygons"),
-            self.deleteSelectedShape,
+            self.deleteSelectedObject,
             shortcuts["delete_polygon"],
             "cancel",
             self.tr("Delete the selected polygons"),
@@ -475,19 +478,19 @@ class MainWindow(QtWidgets.QMainWindow):
             enabled=False,
         )
         copy = action(
-            self.tr("Copy Polygons"),
+            self.tr("Copy"),
             self.copySelectedShape,
             shortcuts["copy_polygon"],
             "copy_clipboard",
-            self.tr("Copy selected polygons to clipboard"),
+            self.tr("Copy selected to clipboard"),
             enabled=False,
         )
         paste = action(
-            self.tr("Paste Polygons"),
+            self.tr("Paste"),
             self.pasteSelectedShape,
             shortcuts["paste_polygon"],
             "paste",
-            self.tr("Paste copied polygons"),
+            self.tr("Paste copied"),
             enabled=False,
         )
         undoLastPoint = action(
@@ -620,6 +623,14 @@ class MainWindow(QtWidgets.QMainWindow):
             "Adjust brightness and contrast",
             enabled=False,
         )
+        brushOptions = action(
+            "&Brush Options",
+            self.brushOptions,
+            None,
+            "color",
+            "Brush Options",
+            enabled=False,
+        )
         # Group zoom controls into a list for easier toggling.
         zoomActions = (
             self.zoomWidget,
@@ -708,6 +719,7 @@ class MainWindow(QtWidgets.QMainWindow):
             fitWindow=fitWindow,
             fitWidth=fitWidth,
             brightnessContrast=brightnessContrast,
+            brushOptions=brushOptions,
             zoomActions=zoomActions,
             openNextImg=openNextImg,
             openPrevImg=openPrevImg,
@@ -870,14 +882,13 @@ class MainWindow(QtWidgets.QMainWindow):
             createMode,
             editMode,
             duplicate,
-            copy,
-            paste,
             delete,
             None,
             undo,
             brightnessContrast,
             zoom,
             fitWidth,
+            brushOptions,
             None,
             selectAiModel,
         )
@@ -965,7 +976,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Support Functions
 
-    def noShapes(self):
+    def noObjects(self):
         return not len(self.labelList)
 
     def populateModeActions(self):
@@ -1330,7 +1341,7 @@ class MainWindow(QtWidgets.QMainWindow):
             item = self.currentItem()
         if item is None:
             return
-        shape = item.shape()
+        shape = item.object()
         if shape is None:
             return
         text, flags, group_id, description = self.labelDialog.popUp(
@@ -1393,23 +1404,33 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.loadFile(filename)
 
     # React to canvas signals.
-    def shapeSelectionChanged(self, selected_shapes):
-        self._noSelectionSlot = True
-        for shape in self.canvas.selectedShapes:
-            shape.selected = False
-        self.labelList.clearSelection()
-        self.canvas.selectedShapes = selected_shapes
-        for shape in self.canvas.selectedShapes:
-            shape.selected = True
-            item = self.labelList.findItemByShape(shape)
-            self.labelList.selectItem(item)
-            self.labelList.scrollToItem(item)
-        self._noSelectionSlot = False
-        n_selected = len(selected_shapes)
-        self.actions.delete.setEnabled(n_selected)
-        self.actions.duplicate.setEnabled(n_selected)
-        self.actions.copy.setEnabled(n_selected)
-        self.actions.edit.setEnabled(n_selected == 1)
+    def objectSelectionChanged(self, selected_objects):
+        if self.canvas.overviewBrushing():
+            # brush
+            self.labelList.clearSelection()
+            self.canvas.selectedBrushes = selected_objects
+            n_selected = len(selected_objects)
+            self.actions.delete.setEnabled(n_selected)
+            self.actions.copy.setEnabled(n_selected)
+            self.actions.brushOptions.setEnabled(n_selected == 1)
+        else:
+            # shape
+            self._noSelectionSlot = True
+            for shape in self.canvas.selectedShapes:
+                shape.selected = False
+            self.labelList.clearSelection()
+            self.canvas.selectedShapes = selected_objects
+            for shape in self.canvas.selectedShapes:
+                shape.selected = True
+                item = self.labelList.findItemByShape(shape)
+                self.labelList.selectItem(item)
+                self.labelList.scrollToItem(item)
+            self._noSelectionSlot = False
+            n_selected = len(selected_objects)
+            self.actions.delete.setEnabled(n_selected)
+            self.actions.duplicate.setEnabled(n_selected)
+            self.actions.copy.setEnabled(n_selected)
+            self.actions.edit.setEnabled(n_selected == 1)
 
     def addLabel(self, shape):
         if shape.group_id is None:
@@ -1500,10 +1521,21 @@ class MainWindow(QtWidgets.QMainWindow):
             return self._config["default_shape_color"]
         return (0, 255, 0)
 
-    def remLabels(self, shapes):
-        for shape in shapes:
-            item = self.labelList.findItemByShape(shape)
-            self.labelList.removeItem(item)
+    def remLabels(self, objects):
+        if self.canvas.overviewBrushing():
+            for brush in objects:
+                item = self.labelList.findItemByBrush(brush)
+                self.labelList.removeItem(item)
+        else:
+            for shape in objects:
+                item = self.labelList.findItemByShape(shape)
+                self.labelList.removeItem(item)
+
+    def loadBrushes(self, brushes):
+        for brush in brushes:
+            self.addLabelFromBrush(brush)
+        self.canvas.loadBrushes(brushes, False)
+
 
     def loadShapes(self, shapes, replace=True):
         self._noSelectionSlot = True
@@ -1590,7 +1622,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return data
 
-        shapes = [format_shape(item.shape()) for item in self.labelList]
+        shapes = [format_shape(item.object()) for item in self.labelList]
         flags = {}
         for i in range(self.flag_widget.count()):
             item = self.flag_widget.item(i)
@@ -1638,12 +1670,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setDirty()
 
     def pasteSelectedShape(self):
-        self.loadShapes(self._copied_shapes, replace=False)
+        if(self.canvas.overviewBrushing()):
+            # brush
+            self.loadBrushes(self._copied_brushes)
+        else:
+            # polygon
+            self.loadShapes(self._copied_shapes, replace=False)
+        self.actions.copy.setEnabled(False)
+        self.actions.paste.setEnabled(False)
         self.setDirty()
 
     def copySelectedShape(self):
-        self._copied_shapes = [s.copy() for s in self.canvas.selectedShapes]
-        self.actions.paste.setEnabled(len(self._copied_shapes) > 0)
+        if(self.canvas.overviewBrushing()):
+            self._copied_brushes = [s.copy() for s in self.canvas.selectedBrushes]
+            self.actions.paste.setEnabled(len(self._copied_brushes) > 0)
+        else:
+            self._copied_shapes = [s.copy() for s in self.canvas.selectedShapes]
+            self.actions.paste.setEnabled(len(self._copied_shapes) > 0)
 
     def labelSelectionChanged(self):
         if self._noSelectionSlot:
@@ -1651,19 +1694,30 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.canvas.editing():
             selected_shapes = []
             for item in self.labelList.selectedItems():
-                selected_shapes.append(item.shape())
+                selected_shapes.append(item.object())
             if selected_shapes:
                 self.canvas.selectShapes(selected_shapes)
             else:
                 self.canvas.deSelectShape()
+            return
+
+        if self.canvas.overviewBrushing():
+            selected_brushes = []
+            for item in self.labelList.selectedItems():
+                selected_brushes.append(item.object())
+            if selected_brushes:
+                self.canvas.selectShapes(selected_brushes)
+            else:
+                self.canvas.deSelectShape()
+            return
 
     def labelItemChanged(self, item):
-        shape = item.shape()
+        shape = item.object()
         self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
 
     def labelOrderChanged(self):
         self.setDirty()
-        self.canvas.loadShapes([item.shape() for item in self.labelList])
+        self.canvas.loadShapes([item.object() for item in self.labelList])
 
     # Callback functions:
 
@@ -1775,6 +1829,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.loadPixmap(
             QtGui.QPixmap.fromImage(qimage), clear_shapes=False
         )
+    
+    def onNewBrushOptions(self, opacity):
+        self.canvas.selectedBrushes[0].opacity = opacity / 255.0
+        self.canvas.repaint()
+    
+    def brushOptions(self):
+        opacity = self.canvas.selectedBrushes[0].opacity / 1.0 * 255
+        dialog = BrushOptionsDialog(
+            opacity,
+            self.onNewBrushOptions,
+            parent=self,
+        )
+        if opacity is not None:
+            dialog.slider_opacity.setValue(opacity)
+        self.canvas.brushDialogIsOpen = True
+        dialog.exec_()
+
+        opacity = dialog.slider_opacity.value()
+        self.canvas.brushDialogIsOpen = False
 
     def brightnessContrast(self, value):
         dialog = BrightnessContrastDialog(
@@ -1882,7 +1955,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.labelFile.flags is not None:
                 flags.update(self.labelFile.flags)
         self.loadFlags(flags)
-        if self._config["keep_prev"] and self.noShapes():
+        if self._config["keep_prev"] and self.noObjects():
             self.loadShapes(prev_shapes, replace=False)
             self.setDirty()
         else:
@@ -2230,7 +2303,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Message Dialogs. #
     def hasLabels(self):
-        if self.noShapes():
+        if self.noObjects():
             self.errorMessage(
                 "No objects labeled",
                 "You must label at least one object to save the file.",
@@ -2284,25 +2357,36 @@ class MainWindow(QtWidgets.QMainWindow):
         if not self.canvas.hShape.points:
             self.canvas.deleteShape(self.canvas.hShape)
             self.remLabels([self.canvas.hShape])
-            if self.noShapes():
+            if self.noObjects():
                 for action in self.actions.onShapesPresent:
                     action.setEnabled(False)
         self.setDirty()
 
-    def deleteSelectedShape(self):
+    def deleteSelectedObject(self):
         yes, no = QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No
-        msg = self.tr(
-            "You are about to permanently delete {} polygons, "
-            "proceed anyway?"
-        ).format(len(self.canvas.selectedShapes))
-        if yes == QtWidgets.QMessageBox.warning(
-            self, self.tr("Attention"), msg, yes | no, yes
-        ):
-            self.remLabels(self.canvas.deleteSelected())
-            self.setDirty()
-            if self.noShapes():
-                for action in self.actions.onShapesPresent:
-                    action.setEnabled(False)
+        if self.canvas.overviewBrushing():
+            msg = self.tr(
+                "You are about to permanently delete {} brush, "
+                "proceed anyway?"
+            ).format(len(self.canvas.selectedBrushes))
+            if yes == QtWidgets.QMessageBox.warning(
+                self, self.tr("Attention"), msg, yes | no, yes
+            ):
+                self.remLabels(self.canvas.deleteSelected())
+                self.setDirty()
+        else:
+            msg = self.tr(
+                "You are about to permanently delete {} polygons, "
+                "proceed anyway?"
+            ).format(len(self.canvas.selectedShapes))
+            if yes == QtWidgets.QMessageBox.warning(
+                self, self.tr("Attention"), msg, yes | no, yes
+            ):
+                self.remLabels(self.canvas.deleteSelected())
+                self.setDirty()
+                if self.noObjects():
+                    for action in self.actions.onShapesPresent:
+                        action.setEnabled(False)
 
     def copyShape(self):
         self.canvas.endMove(copy=True)

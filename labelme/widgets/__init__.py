@@ -2,6 +2,8 @@
 
 from .brightness_contrast_dialog import BrightnessContrastDialog
 
+from .brush_options_dialog import BrushOptionsDialog
+
 from .canvas import Canvas
 
 from .color_dialog import ColorDialog

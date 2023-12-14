@@ -1,3 +1,5 @@
+import random
+import string
 import gdown
 from qtpy import QtCore
 from PyQt5.QtCore import QTimer, QTime
@@ -5,6 +7,7 @@ from qtpy import QtGui
 from qtpy import QtWidgets
 
 import labelme.ai
+import labelme.brush as brushFile
 from labelme.brush import Brush
 from labelme.logger import logger
 from labelme import QT5
@@ -125,7 +128,14 @@ class Canvas(QtWidgets.QWidget):
         self.canvasBrush = Brush()
         self.prevBrushMask = QtGui.QPixmap()
         self.tmpQRect = None
+
+        self.hBrush = None
         self.hBrushId = None
+        self.selectedBrush = None
+        self.selectedBrushes = []
+        self.hBrushIsSelected = False
+        self.movingBrush = False
+        self.brushDialogIsOpen = False
 
 
     def fillDrawing(self):
@@ -384,10 +394,11 @@ class Canvas(QtWidgets.QWidget):
         
         if self.overviewBrushing():
             if QtCore.Qt.LeftButton & ev.buttons():
-                if self.hBrushId is not None:
+                if self.selectedBrushes is not None:
                     self.overrideCursor(CURSOR_MOVE)
-                    self.boundedMoveBrush(self.brushes, pos, prevPoint)
+                    self.boundedMoveBrush(self.selectedBrushes, pos, prevPoint)
                     self.repaint()
+                    self.movingBrush = True
                 return 
 
             # hovering brush on canvas
@@ -403,10 +414,10 @@ class Canvas(QtWidgets.QWidget):
                     and brush.brushMaskFinal.toImage().pixel(newPosX, newPosY)
                 ):
                     # found a brush
-                    self.hBrushId = brush.brushId
+                    self.hBrush = brush
                     self.overrideCursor(CURSOR_POINT)
                     break
-                self.hBrushId = None
+                self.hBrush = None
 
             self.repaint()    
             return 
@@ -607,6 +618,14 @@ class Canvas(QtWidgets.QWidget):
                 self.prevPoint = pos
 
                 self.repaint()
+            elif self.overviewBrushing():
+                if(self.hBrush is not None):
+                    group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
+                    self.selectBrush(multiple_selection_mode=group_mode)
+                else:
+                    self.deSelectBrush()
+                self.prevPoint = pos
+                self.repaint()
         elif ev.button() == QtCore.Qt.RightButton and self.editing():
             group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
             if not self.selectedShapes or (
@@ -647,6 +666,18 @@ class Canvas(QtWidgets.QWidget):
                 self.currentBrush.addStrokeToHistory()
                 self.currentBrush.updateBoundingBox(pos)
                 self.brushMoved.emit()
+            elif self.overviewBrushing():
+                if (
+                    self.hBrush is not None
+                    and self.hBrushIsSelected
+                    and not self.movingBrush
+                ):
+                    self.selectionChanged.emit(
+                        [x for x in self.selectedBrushes if x != self.hBrush]
+                    )
+
+        if self.movingBrush and self.hBrush:
+            self.movingBrush = False
 
         if self.movingShape and self.hShape:
             index = self.shapes.index(self.hShape)
@@ -725,6 +756,18 @@ class Canvas(QtWidgets.QWidget):
                     self.calculateOffsets(point)
                     return
         self.deSelectShape()
+    
+    def selectBrush(self, multiple_selection_mode):
+        if self.hBrush not in self.selectedBrushes:
+            if multiple_selection_mode:
+                self.selectionChanged.emit(
+                    self.selectedBrushes + [self.hBrush]
+                )
+            else:
+                self.selectionChanged.emit([self.hBrush])
+            self.hBrushIsSelected = False
+        else:
+            self.hBrushIsSelected = True
 
     def calculateOffsets(self, point):
         left = self.pixmap.width() - 1
@@ -786,11 +829,15 @@ class Canvas(QtWidgets.QWidget):
         dp = QtCore.QPoint(int(pos.x()) - int(prevPoint.x()), int(pos.y()) - int(prevPoint.y()))
         if dp:
             for brush in chosenBrushes:
-                if brush.brushId == self.hBrushId:
-                    brush.moveBy(dp)
+                brush.moveBy(dp)
             self.prevPoint = pos
             return True
         return False
+    
+    def deSelectBrush(self):
+        self.selectionChanged.emit([])
+        self.update()
+
 
     def deSelectShape(self):
         if self.selectedShapes:
@@ -800,15 +847,22 @@ class Canvas(QtWidgets.QWidget):
             self.update()
 
     def deleteSelected(self):
-        deleted_shapes = []
-        if self.selectedShapes:
-            for shape in self.selectedShapes:
-                self.shapes.remove(shape)
-                deleted_shapes.append(shape)
-            self.storeShapes()
-            self.selectedShapes = []
-            self.update()
-        return deleted_shapes
+        deleted_objects = []
+        if self.overviewBrushing():
+            if self.selectedBrushes:
+                for brush in self.selectedBrushes:
+                    self.brushes.remove(brush)
+                    deleted_objects.append(brush)
+                self.selectedBrush = []
+        else:
+            if self.selectedShapes:
+                for shape in self.selectedShapes:
+                    self.shapes.remove(shape)
+                    deleted_objects.append(shape)
+                self.storeShapes()
+                self.selectedShapes = []
+        self.update()
+        return deleted_objects
 
     def deleteShape(self, shape):
         if shape in self.selectedShapes:
@@ -879,15 +933,15 @@ class Canvas(QtWidgets.QWidget):
                 self.canvasBrush.resetCanvasDraft()
                 for brush in self.brushes:
                     self.canvasBrush.pasteToBrushCanvas(brush)
-                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.2)
+                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.3)
             if self.currentBrush:
-                self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode)
+                self.currentBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 0.6)
         elif self.overviewBrushing():
             self.canvasBrush.resetCanvasDraft()
             for brush in self.brushes:
                 self.canvasBrush.resetCanvasDraft()
                 self.canvasBrush.pasteToBrushCanvas(brush)
-                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 1.0 if (self.hBrushId is not None and brush.brushId == self.hBrushId) else 0.6 )
+                self.canvasBrush.brushPainter(p, self.prevMovePoint, self.brushMode, 1.0 if (self.hBrush == brush or brush in self.selectedBrushes and not self.brushDialogIsOpen) else brush.opacity )
         else:
             Shape.scale = self.scale
             for shape in self.shapes:
@@ -1139,6 +1193,9 @@ class Canvas(QtWidgets.QWidget):
                 self.currentBrush.setCurrentBrushValue(self.tmpQRect.left(), self.tmpQRect.top(), self.tmpQRect.width(), self.tmpQRect.height())
                 self.finaliseBrush()
                 self.update()
+        elif self.overviewBrushing():
+            pass
+
                 
     def getBoundingBox(self):
         self.start_time = QTime.currentTime()
@@ -1265,6 +1322,14 @@ class Canvas(QtWidgets.QWidget):
             )
         if clear_shapes:
             self.shapes = []
+        self.update()
+    
+    def loadBrushes(self, brushes, replace=True):
+        if replace:
+            self.brushes = list(brushes)
+        else:
+            self.brushes.extend(brushes)
+        self.hShape = None
         self.update()
 
     def loadShapes(self, shapes, replace=True):
