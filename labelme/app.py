@@ -2277,7 +2277,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 shape.addPoint(QtCore.QPointF(input[WIDTH] + input[X], input[HEIGHT] + input[Y]))
                 shape.close()
                 s.append(shape)
-            self.loadShapes(s)
+            self.loadShapes(s, True)
 
 
 
