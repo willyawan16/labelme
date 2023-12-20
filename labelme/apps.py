@@ -14,11 +14,7 @@ class TableWidget(QtWidgets.QWidget):
     def __init__(
             self, 
             parent,
-            config=None,
-            filename=None,
-            output=None,
-            output_file=None,
-            output_dir=None,
+            annotation
         ):
         super(QtWidgets.QWidget, self).__init__(parent)
         self.layout = QtWidgets.QVBoxLayout(self)
@@ -43,8 +39,8 @@ class TableWidget(QtWidgets.QWidget):
 
         # Create second tab
         self.tab2.layout = QtWidgets.QVBoxLayout(self)
-        self.annotation = Annotation(self, config, filename)
-        self.tab2.layout.addWidget(self.annotation)
+        
+        self.tab2.layout.addWidget(annotation)
         self.tab2.setLayout(self.tab2.layout)
         
         # Add tabs to widget
@@ -68,7 +64,9 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__()
         self.setWindowTitle(__appname__)
 
-        self.table_widget = TableWidget(self, config, filename, output, output_file, output_dir)
+        self.annotation = Annotation(self, config, filename)
+
+        self.table_widget = TableWidget(self, self.annotation)
         self.setCentralWidget(self.table_widget)
 
         actions = self.initActions()
@@ -76,6 +74,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.statusBar().showMessage(str(self.tr("%s started.")) % __appname__)
         self.statusBar().show()
+
+        font = self.font()
+        font.setPointSize(12)
+        QtWidgets.QApplication.instance().setFont(font)
         
         self.restoreSettings()
     

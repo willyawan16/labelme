@@ -15,6 +15,7 @@ from labelme.ai import MODELS
 from labelme.brush import Brush, DEFAULT_PEN_COLOR
 from labelme.config import get_config
 from labelme.label_file import LabelFile
+from labelme.label_file import LabelFileError
 from labelme.logger import logger
 from labelme.widgets import BrightnessContrastDialog
 from labelme.widgets import Canvas
@@ -40,6 +41,7 @@ class Annotation(QtWidgets.QWidget):
         filename=None,
     ):
         super(Annotation, self).__init__(parent)
+        self.parent = parent
 
         # see labelme/config/default_config.yaml for valid configuration
         if config is None:
@@ -90,6 +92,7 @@ class Annotation(QtWidgets.QWidget):
             slider = functools.partial(utils.newSlider, self)
             textBox = functools.partial(utils.newTextBox, self)
             shortcuts = self._config["shortcuts"]
+            self.shortcuts = shortcuts
 
             open_ = action(
                 self.tr("&Open"),
@@ -186,7 +189,7 @@ class Annotation(QtWidgets.QWidget):
                 self.placeholder,# self.toggleKeepPrevMode,
                 shortcuts["toggle_keep_prev_mode"],
                 None,
-                self.tr('Toggle "keep pevious annotation" mode'),
+                self.tr('Toggle "keep previous annotation" mode'),
                 checkable=True,
             )
             toggle_keep_prev_mode.setChecked(self._config["keep_prev"])
@@ -606,13 +609,13 @@ class Annotation(QtWidgets.QWidget):
             selectAiModel = initAIModel(self)
 
             self.actions.tool = (
-                open_,
-                opendir,
-                openNextImg,
-                openPrevImg,
-                save,
-                deleteFile,
-                None,
+                ##open_,
+                ##opendir,
+                ##openNextImg,
+                ##openPrevImg,
+                ##save,
+                ##deleteFile,
+                ##None,
                 brushMode,
                 brushDrawMode,
                 brushEraseMode,
@@ -650,10 +653,10 @@ class Annotation(QtWidgets.QWidget):
             self.labelList = LabelListWidget()
             self.lastOpenDir = None
 
-            ##self.labelList.itemSelectionChanged.connect(self.labelSelectionChanged)
+            self.labelList.itemSelectionChanged.connect(self.labelSelectionChanged)
             self.labelList.itemDoubleClicked.connect(self.editLabel)
-            ##self.labelList.itemChanged.connect(self.labelItemChanged)
-            ##self.labelList.itemDropped.connect(self.labelOrderChanged)
+            self.labelList.itemChanged.connect(self.labelItemChanged)
+            self.labelList.itemDropped.connect(self.labelOrderChanged)
 
             self.uniqLabelList = UniqueLabelQListWidget()
             self.uniqLabelList.setToolTip(
@@ -678,11 +681,6 @@ class Annotation(QtWidgets.QWidget):
             )
             self.canvas.zoomRequest.connect(self.zoomRequest)
 
-            self.filename = "C:/AOI/上蓋標記檔/白色上蓋標記檔/13_1_1_8000.jpg"
-            self.imageData = LabelFile.load_image_file(self.filename)
-            self.image = QtGui.QImage.fromData(self.imageData)
-            self.canvas.loadPixmap(QtGui.QPixmap.fromImage(self.image))
-
             self.canvas.newShape.connect(self.newShape)
             self.canvas.newBrush.connect(self.newBrush)
             self.canvas.brushMoved.connect(self.setDirty)
@@ -699,6 +697,7 @@ class Annotation(QtWidgets.QWidget):
                 toolbar.setObjectName("%sToolBar" % title)
                 toolbar.setOrientation(Qt.Horizontal)
                 toolbar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+                toolbar.setMinimumHeight(70)
 
                 if actions:
                     utils.addActions(toolbar, actions)
@@ -716,21 +715,28 @@ class Annotation(QtWidgets.QWidget):
             leftWidget.setLayout(leftWidget.layout)
 
             leftTabs = QtWidgets.QTabWidget()
+            leftTabs.setMinimumWidth(180)
             leftWidget.layout.addWidget(leftTabs)
 
-            self.tabVal = ImageList(self)
-            self.tabTrain = ImageList(self)
+            self.tabVal = ImageList(self, self.shortcuts)
+            self.tabTrain = ImageList(self, self.shortcuts)
             leftTabs.addTab(self.tabVal, "Validation")
             leftTabs.addTab(self.tabTrain, "Training")
 
             # Middle widget
             middleWidget = QtWidgets.QWidget()
+            middleWidget.setMinimumSize(300, 300)
             middleWidget.layout = QtWidgets.QVBoxLayout(middleWidget)
             middleWidget.layout.setContentsMargins(0, 0, 0, 0)
             middleWidget.setLayout(middleWidget.layout)
 
+            toolScroll = QtWidgets.QScrollArea(middleWidget)
+            toolScroll.setFixedHeight(78)
+            toolScroll.setStyleSheet("QScrollBar:horizontal { height: 5px; }")
+            middleWidget.layout.addWidget(toolScroll)
+
             self.tools = toolbar("Tools", self.actions.tool)
-            middleWidget.layout.addWidget(self.tools)
+            toolScroll.setWidget(self.tools)
 
             self.canvasArea = QtWidgets.QScrollArea()
             self.canvasArea.setWidget(self.canvas)
@@ -749,13 +755,25 @@ class Annotation(QtWidgets.QWidget):
             rightWidget.layout = QtWidgets.QVBoxLayout(rightWidget)
             rightWidget.layout.setContentsMargins(0, 0, 0, 0)
             rightWidget.setLayout(rightWidget.layout)
+            rightWidget.setMinimumWidth(160)
 
+            rightWidget.layout.addWidget(QtWidgets.QLabel('Polygon Labels'))
             rightWidget.layout.addWidget(self.labelList)
+            rightWidget.layout.addWidget(QtWidgets.QLabel('Label List'))
             rightWidget.layout.addWidget(self.uniqLabelList)
 
-            self.layout.addWidget(leftWidget)
-            self.layout.addWidget(middleWidget)
-            self.layout.addWidget(rightWidget)
+            # Splitter
+            splitter = QtWidgets.QSplitter(Qt.Horizontal)
+            splitter.addWidget(leftWidget)
+            splitter.addWidget(middleWidget)
+            splitter.addWidget(rightWidget)
+            splitter.setChildrenCollapsible(False)
+            
+            factors = [20, 60, 20]
+            for i in range(len(factors)):
+                splitter.setStretchFactor(i, factors[i])
+
+            self.layout.addWidget(splitter)
 
         def initState(self, filename):
             # Whether we need to save or not.
@@ -773,14 +791,39 @@ class Annotation(QtWidgets.QWidget):
             }
 
             ##
+            self.filename = filename
             if False and filename is not None and osp.isdir(filename):
                 self.importDirImages(filename, load=False)
             elif False:
                 self.filename = filename
 
+        def populateModeActions(self):
+            menu = self.actions.menu
+            #self.tools.clear()
+            #utils.addActions(self.tools, tool)
+            self.canvas.menus[0].clear()
+            utils.addActions(self.canvas.menus[0], menu)
+            ##self.menus.edit.clear()
+            actions = (
+                self.actions.createMode,
+                self.actions.createRectangleMode,
+                self.actions.createCircleMode,
+                self.actions.createLineMode,
+                self.actions.createPointMode,
+                self.actions.createLineStripMode,
+                self.actions.createAiPolygonMode,
+                self.actions.editMode,
+            )
+            ##utils.addActions(self.menus.edit, actions + self.actions.editMenu)
+
         self.zoomWidget = ZoomWidget()
         self.setAcceptDrops(True)
         self.zoomWidget.valueChanged.connect(self.paintCanvas)
+
+        self.fileListWidget = QtWidgets.QListWidget()
+        self.fileListWidget.itemSelectionChanged.connect(
+            self.placeholder##self.fileSelectionChanged
+        )
 
         initCanvas(self)
 
@@ -792,9 +835,197 @@ class Annotation(QtWidgets.QWidget):
 
         initState(self, filename)
 
-        self.actions.createMode.setEnabled(True)
+        populateModeActions(self)
+
+        if self.filename is not None:
+            self.queueEvent(functools.partial(self.loadFile, self.filename))
+        
+        self.loadFile('C:/AOI/上蓋標記檔/白色上蓋標記檔/13_1_1_8000.jpg')
+
+    #region FILES
+    
+    @property
+    def imageList(self):
+        lst = []
+        for i in range(self.fileListWidget.count()):
+            item = self.fileListWidget.item(i)
+            lst.append(item.text())
+        return lst
+
+    def loadFile(self, filename=None):
+        """Load the specified file, or the last opened file if None."""
+        # changing fileListWidget loads file
+        if filename in self.imageList and (
+            self.fileListWidget.currentRow() != self.imageList.index(filename)
+        ):
+            self.fileListWidget.setCurrentRow(self.imageList.index(filename))
+            self.fileListWidget.repaint()
+            return
+
+        self.resetState()
+        self.canvas.setEnabled(False)
+        if filename is None:
+            filename = self.settings.value("filename", "")
+        filename = str(filename)
+        if not QtCore.QFile.exists(filename):
+            self.errorMessage(
+                self.tr("Error opening file"),
+                self.tr("No such file: <b>%s</b>") % filename,
+            )
+            return False
+        # assumes same name, but json extension
+        self.status(
+            str(self.tr("Loading %s...")) % osp.basename(str(filename))
+        )
+        label_file = osp.splitext(filename)[0] + ".json"
+        ##if self.output_dir:
+        ##    label_file_without_path = osp.basename(label_file)
+        ##    label_file = osp.join(self.output_dir, label_file_without_path)
+        if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(
+            label_file
+        ):
+            try:
+                self.labelFile = LabelFile(label_file)
+            except LabelFileError as e:
+                self.errorMessage(
+                    self.tr("Error opening file"),
+                    self.tr(
+                        "<p><b>%s</b></p>"
+                        "<p>Make sure <i>%s</i> is a valid label file."
+                    )
+                    % (e, label_file),
+                )
+                self.status(self.tr("Error reading %s") % label_file)
+                return False
+            self.imageData = self.labelFile.imageData
+            self.imagePath = osp.join(
+                osp.dirname(label_file),
+                self.labelFile.imagePath,
+            )
+            self.otherData = self.labelFile.otherData
+        else:
+            self.imageData = LabelFile.load_image_file(filename)
+            if self.imageData:
+                self.imagePath = filename
+            self.labelFile = None
+        image = QtGui.QImage.fromData(self.imageData)
+
+        if image.isNull():
+            formats = [
+                "*.{}".format(fmt.data().decode())
+                for fmt in QtGui.QImageReader.supportedImageFormats()
+            ]
+            self.errorMessage(
+                self.tr("Error opening file"),
+                self.tr(
+                    "<p>Make sure <i>{0}</i> is a valid image file.<br/>"
+                    "Supported image formats: {1}</p>"
+                ).format(filename, ",".join(formats)),
+            )
+            self.status(self.tr("Error reading %s") % filename)
+            return False
+        self.image = image
+        self.filename = filename
+        if self._config["keep_prev"]:
+            prev_shapes = self.canvas.shapes
+        self.canvas.loadPixmap(QtGui.QPixmap.fromImage(image))
+        flags = {k: False for k in self._config["flags"] or []}
+        if self.labelFile:
+            self.loadLabels(self.labelFile.shapes)
+            if self.labelFile.flags is not None:
+                flags.update(self.labelFile.flags)
+        ##self.loadFlags(flags)
+        if self._config["keep_prev"] and self.noShapes():
+            self.loadShapes(prev_shapes, replace=False)
+            self.setDirty()
+        else:
+            self.setClean()
+        self.canvas.setEnabled(True)
+        # set zoom values
+        is_initial_load = not self.zoom_values
+        if self.filename in self.zoom_values:
+            self.zoomMode = self.zoom_values[self.filename][0]
+            self.setZoom(self.zoom_values[self.filename][1])
+        elif is_initial_load or not self._config["keep_prev_scale"]:
+            self.adjustScale(initial=True)
+        # set scroll values
+        for orientation in self.scroll_values:
+            if self.filename in self.scroll_values[orientation]:
+                self.setScroll(
+                    orientation, self.scroll_values[orientation][self.filename]
+                )
+        # set brightness contrast values
+        dialog = BrightnessContrastDialog(
+            utils.img_data_to_pil(self.imageData),
+            self.onNewBrightnessContrast,
+            parent=self,
+        )
+        brightness, contrast = self.brightnessContrast_values.get(
+            self.filename, (None, None)
+        )
+        if self._config["keep_prev_brightness"] and self.recentFiles:
+            brightness, _ = self.brightnessContrast_values.get(
+                self.recentFiles[0], (None, None)
+            )
+        if self._config["keep_prev_contrast"] and self.recentFiles:
+            _, contrast = self.brightnessContrast_values.get(
+                self.recentFiles[0], (None, None)
+            )
+        if brightness is not None:
+            dialog.slider_brightness.setValue(brightness)
+        if contrast is not None:
+            dialog.slider_contrast.setValue(contrast)
+        self.brightnessContrast_values[self.filename] = (brightness, contrast)
+        if brightness is not None or contrast is not None:
+            dialog.onNewValue(None)
+
+        
+        # Brush related
+        # self.canvas.currentBrush.initBrushCanvas(image.width(), image.height())
+        self.canvas.canvasBrush.initBrushCanvas(image.width(), image.height(), False)
+        if self.labelFile:
+            if self.labelFile.b64brushMask is not None:
+                self.loadBrushMask()
+        
+        self.paintCanvas()
+        ##self.addRecentFile(self.filename)
+        self.toggleActions(True)
+        self.canvas.setFocus()
+        self.status(str(self.tr("Loaded %s")) % osp.basename(str(filename)))
+        return True
+
+    #endregion FILES
+
+    #region STATE
+
+    def toggleActions(self, value=True):
+        """Enable/Disable widgets which depend on an opened image."""
+        for z in self.actions.zoomActions:
+            z.setEnabled(value)
+        for action in self.actions.onLoadActive:
+            action.setEnabled(value)
+    
+    def queueEvent(self, function):
+        QtCore.QTimer.singleShot(0, function)
+    
+    def resetState(self):
+        self.labelList.clear()
+        self.filename = None
+        self.imagePath = None
+        self.imageData = None
+        self.labelFile = None
+        self.otherData = None
+        self.canvas.resetState()
+    
+    def status(self, message, delay=5000):
+        self.parent.statusBar().showMessage(message, delay)
+
+    #endregion STATE
 
     #region CANVAS ACTION
+    
+    def noShapes(self):
+        return not len(self.labelList)
 
     def toggleDrawMode(self, edit=True, createMode="polygon"):
         self.canvas.setEditing(edit)
@@ -1301,6 +1532,26 @@ class Annotation(QtWidgets.QWidget):
     def popLabelListMenu(self, point):
         self.menus.labelList.exec_(self.labelList.mapToGlobal(point))
 
+    def labelSelectionChanged(self):
+        if self._noSelectionSlot:
+            return
+        if self.canvas.editing():
+            selected_shapes = []
+            for item in self.labelList.selectedItems():
+                selected_shapes.append(item.shape())
+            if selected_shapes:
+                self.canvas.selectShapes(selected_shapes)
+            else:
+                self.canvas.deSelectShape()
+
+    def labelItemChanged(self, item):
+        shape = item.shape()
+        self.canvas.setShapeVisible(shape, item.checkState() == Qt.Checked)
+
+    def labelOrderChanged(self):
+        self.setDirty()
+        self.canvas.loadShapes([item.shape() for item in self.labelList])
+
     #endregion LABEL
 
     def paintCanvas(self):
@@ -1310,6 +1561,15 @@ class Annotation(QtWidgets.QWidget):
         self.canvas.update()
 
     #region SCROOL ZOOM BRIGHTNESS CONTRAST
+        
+    def resizeEvent(self, event):
+        if (
+            self.canvas
+            and not self.image.isNull()
+            and self.zoomMode != self.MANUAL_ZOOM
+        ):
+            self.adjustScale()
+        super(Annotation, self).resizeEvent(event)
 
     def scrollRequest(self, delta, orientation):
         units = -delta * 0.1  # natural scroll
@@ -1468,6 +1728,9 @@ class Annotation(QtWidgets.QWidget):
         return (0, 255, 0)
 
     #endregion OTHERS
+
+    def setClean(self):
+        pass
 
     def setDirty(self):
         pass
