@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import yaml
 import functools
 import html
 import json
@@ -278,6 +278,24 @@ class MainWindow(QtWidgets.QMainWindow):
             "save-as",
             self.tr("Save labels to a different file"),
             enabled=False,
+        )
+
+        importCocoBBox= action(
+            self.tr("&Import Coco BBox"),
+            self.importToCocoBBox,
+            None,
+            "open",                                  
+            self.tr("Import from coco BBox"),
+            enabled=False,   
+        )
+
+        exportCocoBBox= action(
+            self.tr("&Export Coco BBox"),
+            self.exportToCocoBBox,
+            None,
+            "save",                                  
+            self.tr("Export to coco BBox"),
+            enabled=False,   
         )
 
         deleteFile = action(
@@ -723,6 +741,8 @@ class MainWindow(QtWidgets.QMainWindow):
             zoomActions=zoomActions,
             openNextImg=openNextImg,
             openPrevImg=openPrevImg,
+            importCocoBBox=importCocoBBox,
+            exportCocoBBox=exportCocoBBox,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
             tool=(),
             # XXX: need to add some actions here to activate the shortcut
@@ -769,7 +789,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 createAiPolygonMode,
                 editMode,
                 brightnessContrast,
-                brushMode
+                brushMode,
+                importCocoBBox
             ),
             onShapesPresent=(saveAs, hideAll, showAll),
         )
@@ -889,6 +910,8 @@ class MainWindow(QtWidgets.QMainWindow):
             zoom,
             fitWidth,
             brushOptions,
+            importCocoBBox,
+            exportCocoBBox,
             None,
             selectAiModel,
         )
@@ -1544,6 +1567,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.labelList.clearSelection()
         self._noSelectionSlot = False
         self.canvas.loadShapes(shapes, replace=replace)
+        if len(self.canvas.shapes) > 0 and not self.actions.exportCocoBBox.isEnabled():
+            self.actions.exportCocoBBox.setEnabled(True)
 
     def loadBrushMask(self):
         data = QtCore.QByteArray.fromBase64(self.labelFile.b64brushMask)
@@ -1760,6 +1785,8 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.canvas.undoLastLine()
             self.canvas.shapesBackups.pop()
+        if len(self.canvas.shapes) > 0 and not self.actions.exportCocoBBox.isEnabled():
+            self.actions.exportCocoBBox.setEnabled(True)
 
     def scrollRequest(self, delta, orientation):
         units = -delta * 0.1  # natural scroll
@@ -2219,7 +2246,58 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self._saveFile(self.saveFileDialog())
 
-        
+    def importToCocoBBox(self):
+        INDEX = 0
+        X = 1
+        Y = 2
+        WIDTH = 3
+        HEIGHT = 4
+
+        with open("coco.yaml", 'r') as stream:
+            cfg = yaml.safe_load(stream)
+        coco_file = osp.join(self.filename[:-4] + '.txt')
+        if not QtCore.QFile.exists(coco_file):
+            self.errorMessage(
+                self.tr("Error importing file"),
+                'File not found'
+            )
+            return 
+        with open(osp.join(self.filename[:-4] + '.txt'), "r") as f:
+            s = []
+            for row in f:
+                line = row.strip()
+                input = list(map(float, line.split()))
+                shape = Shape(
+                    label=cfg['names'][int(input[INDEX])],
+                    shape_type='rectangle',
+                    group_id=None,
+                    description=None,
+                )
+                shape.addPoint(QtCore.QPointF(input[X], input[Y]))
+                shape.addPoint(QtCore.QPointF(input[WIDTH] + input[X], input[HEIGHT] + input[Y]))
+                shape.close()
+                s.append(shape)
+            self.loadShapes(s)
+
+
+
+    def exportToCocoBBox(self):
+        with open("coco.yaml", 'r') as stream:
+            cfg = yaml.safe_load(stream)
+        with open(osp.join(self.filename[:-4] + '.txt'), "w") as f:
+            s = ''
+            for shape in self.canvas.shapes:
+                x1, y1 = shape.points[0].x(), shape.points[0].y()
+                x2, y2 = shape.points[1].x(), shape.points[1].y()
+                try:
+                    labelIndex = cfg['names'].index(shape.label)
+                    
+                    # print(f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}', file=f)
+                    s += f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}\n'
+                except Exception as e:
+                    print(e)
+            f.write(s)
+        logger.info("Coco BBox Exported!")
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
