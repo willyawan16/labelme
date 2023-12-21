@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import re
 import webbrowser
+import glob
 
 import imgviz
 import natsort
@@ -295,6 +296,15 @@ class MainWindow(QtWidgets.QMainWindow):
             None,
             "save",                                  
             self.tr("Export to coco BBox"),
+            enabled=False,   
+        )
+
+        exportDirCocoBBox = action(
+            self.tr("&Export Dir"),
+            self.exportDirToCocoBBox,
+            None,
+            None,
+            self.tr("Export dir to coco BBox"),
             enabled=False,   
         )
 
@@ -743,6 +753,7 @@ class MainWindow(QtWidgets.QMainWindow):
             openPrevImg=openPrevImg,
             importCocoBBox=importCocoBBox,
             exportCocoBBox=exportCocoBBox,
+            exportDirCocoBBox=exportDirCocoBBox,
             fileMenuActions=(open_, opendir, save, saveAs, close, quit),
             tool=(),
             # XXX: need to add some actions here to activate the shortcut
@@ -801,6 +812,7 @@ class MainWindow(QtWidgets.QMainWindow):
             file=self.menu(self.tr("&File")),
             edit=self.menu(self.tr("&Edit")),
             view=self.menu(self.tr("&View")),
+            coco=self.menu(self.tr("&Coco")),
             help=self.menu(self.tr("&Help")),
             recentFiles=QtWidgets.QMenu(self.tr("Open &Recent")),
             labelList=labelMenu,
@@ -848,6 +860,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 fitWidth,
                 None,
                 brightnessContrast,
+            ),
+        )
+
+        utils.addActions(
+            self.menus.coco,
+            (
+                # importCocoBBox,
+                exportCocoBBox,
+                exportDirCocoBBox
             ),
         )
 
@@ -910,7 +931,7 @@ class MainWindow(QtWidgets.QMainWindow):
             zoom,
             fitWidth,
             brushOptions,
-            importCocoBBox,
+            # importCocoBBox,
             exportCocoBBox,
             None,
             selectAiModel,
@@ -1569,6 +1590,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.loadShapes(shapes, replace=replace)
         if len(self.canvas.shapes) > 0 and not self.actions.exportCocoBBox.isEnabled():
             self.actions.exportCocoBBox.setEnabled(True)
+            self.actions.exportDirCocoBBox.setEnabled(True)
 
     def loadBrushMask(self):
         data = QtCore.QByteArray.fromBase64(self.labelFile.b64brushMask)
@@ -1662,7 +1684,7 @@ class MainWindow(QtWidgets.QMainWindow):
             lf.save(
                 filename=filename,
                 shapes=shapes,
-                b64brushMask=self.pixmap_to_json(),
+                # b64brushMask=self.pixmap_to_json(),
                 imagePath=imagePath,
                 imageData=imageData,
                 imageHeight=self.image.height(),
@@ -2030,9 +2052,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Brush related
         # self.canvas.currentBrush.initBrushCanvas(image.width(), image.height())
         self.canvas.canvasBrush.initBrushCanvas(image.width(), image.height(), False)
-        if self.labelFile:
-            if self.labelFile.b64brushMask is not None:
-                self.loadBrushMask()
+        # if self.labelFile:
+        #     if self.labelFile.b64brushMask is not None:
+        #         self.loadBrushMask()
         
         self.paintCanvas()
         self.addRecentFile(self.filename)
@@ -2279,24 +2301,89 @@ class MainWindow(QtWidgets.QMainWindow):
                 s.append(shape)
             self.loadShapes(s, True)
 
-
+    def shapesToCocoBBox(self, cfg, shapes):
+        s = ''
+        for shape in shapes:
+            x1, y1 = shape.points[0].x(), shape.points[0].y()
+            x2, y2 = shape.points[1].x(), shape.points[1].y()
+            try:
+                labelIndex = cfg['names'].index(shape.label)
+                
+                # print(f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}', file=f)
+                s += f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}\n'
+            except Exception as e:
+                print(e)
+        return s
 
     def exportToCocoBBox(self):
         with open("coco.yaml", 'r') as stream:
             cfg = yaml.safe_load(stream)
         with open(osp.join(self.filename[:-4] + '.txt'), "w") as f:
-            s = ''
-            for shape in self.canvas.shapes:
-                x1, y1 = shape.points[0].x(), shape.points[0].y()
-                x2, y2 = shape.points[1].x(), shape.points[1].y()
+            f.write(self.shapesToCocoBBox(cfg, self.canvas.shapes))
+        logger.info("Coco BBox Exported!")
+    
+    def exportDirToCocoBBox(self):
+        logger.warn(f"Exporting coco from {self.lastOpenDir}")
+        with open("coco.yaml", 'r') as stream:
+            cfg = yaml.safe_load(stream)
+        for filepath in glob.iglob(f'{self.lastOpenDir}/*.png'):
+            directory, filename = os.path.split(filepath)
+            root, ext = os.path.splitext(filename)
+            label_file = os.path.join(directory, f"{root}.json")
+            lf = None
+            if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(label_file):
                 try:
-                    labelIndex = cfg['names'].index(shape.label)
-                    
-                    # print(f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}', file=f)
-                    s += f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}\n'
-                except Exception as e:
-                    print(e)
-            f.write(s)
+                    lf = LabelFile(label_file)
+                except LabelFileError as e:
+                    self.errorMessage(
+                        self.tr("Error opening file"),
+                        self.tr(
+                            "<p><b>%s</b></p>"
+                            "<p>Make sure <i>%s</i> is a valid label file."
+                        )
+                        % (e, label_file),
+                    )
+                    self.status(self.tr("Error reading %s") % label_file)
+                    return False
+                with open(osp.join(self.filename[:-4] + '.txt'), "w") as f:
+                    recordedShapes = []
+                    for shape in lf.shapes:
+                        label = shape["label"]
+                        points = shape["points"]
+                        shape_type = shape["shape_type"]
+                        flags = shape["flags"]
+                        description = shape.get("description", "")
+                        group_id = shape["group_id"]
+                        other_data = shape["other_data"]
+
+                        if not points:
+                            # skip point-empty shape
+                            continue
+
+                        shape = Shape(
+                            label=label,
+                            shape_type=shape_type,
+                            group_id=group_id,
+                            description=description,
+                        )
+                        for x, y in points:
+                            shape.addPoint(QtCore.QPointF(x, y))
+                        shape.close()
+
+                        default_flags = {}
+                        if self._config["label_flags"]:
+                            for pattern, keys in self._config["label_flags"].items():
+                                if re.match(pattern, label):
+                                    for key in keys:
+                                        default_flags[key] = False
+                        shape.flags = default_flags
+                        shape.flags.update(flags)
+                        shape.other_data = other_data
+
+                        recordedShapes.append(shape)
+                    f.write(self.shapesToCocoBBox(cfg, recordedShapes))
+            else:
+                logger.error(f"{filename} is not labeled/saved yet!")
         logger.info("Coco BBox Exported!")
 
     def saveFileAs(self, _value=False):
