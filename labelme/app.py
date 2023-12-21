@@ -801,7 +801,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 editMode,
                 brightnessContrast,
                 brushMode,
-                importCocoBBox
+                importCocoBBox,
+                exportDirCocoBBox
             ),
             onShapesPresent=(saveAs, hideAll, showAll),
         )
@@ -1590,7 +1591,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.canvas.loadShapes(shapes, replace=replace)
         if len(self.canvas.shapes) > 0 and not self.actions.exportCocoBBox.isEnabled():
             self.actions.exportCocoBBox.setEnabled(True)
-            self.actions.exportDirCocoBBox.setEnabled(True)
 
     def loadBrushMask(self):
         data = QtCore.QByteArray.fromBase64(self.labelFile.b64brushMask)
@@ -2313,12 +2313,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 s += f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}\n'
             except Exception as e:
                 print(e)
+        print(s)
         return s
 
     def exportToCocoBBox(self):
         with open("coco.yaml", 'r') as stream:
             cfg = yaml.safe_load(stream)
-        with open(osp.join(self.filename[:-4] + '.txt'), "w") as f:
+        root, ext = os.path.splitext(self.filename)
+        with open(osp.join(root + '.txt'), "w") as f:
             f.write(self.shapesToCocoBBox(cfg, self.canvas.shapes))
         logger.info("Coco BBox Exported!")
     
@@ -2330,6 +2332,7 @@ class MainWindow(QtWidgets.QMainWindow):
             directory, filename = os.path.split(filepath)
             root, ext = os.path.splitext(filename)
             label_file = os.path.join(directory, f"{root}.json")
+            print("++++++++++++++++++++++++++++++++++++")
             lf = None
             if QtCore.QFile.exists(label_file) and LabelFile.is_label_file(label_file):
                 try:
@@ -2345,7 +2348,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     )
                     self.status(self.tr("Error reading %s") % label_file)
                     return False
-                with open(osp.join(self.filename[:-4] + '.txt'), "w") as f:
+                
+                with open(os.path.join(directory, f'{root}.txt'), "w") as f:
                     recordedShapes = []
                     for shape in lf.shapes:
                         label = shape["label"]
