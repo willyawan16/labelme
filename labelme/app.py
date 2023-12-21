@@ -2313,7 +2313,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 s += f'{labelIndex} {x1} {y1} {x2 - x1} {y2 - y1}\n'
             except Exception as e:
                 print(e)
-        print(s)
         return s
 
     def exportToCocoBBox(self):
